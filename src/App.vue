@@ -4,6 +4,7 @@
       <h1>Crash Game</h1>
       <p class="tagline">Watch the multiplier rise... cash out before it crashes!</p>
       <div class="header-buttons">
+        <button class="debug-button" @click="openDebugPanel">Debug Mode</button>
         <button class="rtp-settings-button" @click="openRTPSettings">RTP Settings</button>
         <button class="reset-button" @click="handleReset">Reset Game</button>
       </div>
@@ -118,6 +119,13 @@
       <GameHistory :rounds="historyState.rounds" :max-display="20" />
     </main>
 
+    <!-- Debug Panel Modal -->
+    <div v-if="isDebugPanelOpen" class="modal-overlay" @click="closeDebugPanel">
+      <div class="modal-content debug-modal" @click.stop>
+        <DebugPanel @close="closeDebugPanel" />
+      </div>
+    </div>
+
     <!-- RTP Settings Modal -->
     <div v-if="isRTPSettingsOpen" class="modal-overlay" @click="closeRTPSettings">
       <div class="modal-content rtp-settings-modal" @click.stop>
@@ -154,6 +162,7 @@ import GameHistory from './components/GameHistory.vue';
 import RTPSettings from './components/RTPSettings.vue';
 import RTPSimulator from './components/RTPSimulator.vue';
 import FairnessVerifier from './components/FairnessVerifier.vue';
+import DebugPanel from './components/DebugPanel.vue';
 import { useGameEngine } from './composables/useGameEngine.js';
 import { useBalance } from './composables/useBalance.js';
 import { useGameHistory } from './composables/useGameHistory.js';
@@ -163,6 +172,9 @@ const { gameState, init, cleanup, on } = useGameEngine();
 const { balanceState, placeBet, cashOut, cancelBet, loseBet, clearCurrentBet, resetBalance } = useBalance();
 const { historyState, addRound, clearHistory } = useGameHistory();
 const { rtpConfig } = useRTPConfig();
+
+// Debug Panel state
+const isDebugPanelOpen = ref(false);
 
 // RTP Settings state
 const isRTPSettingsOpen = ref(false);
@@ -222,6 +234,14 @@ function handleReset() {
     // Reload the page to ensure a clean state
     window.location.reload();
   }
+}
+
+function openDebugPanel() {
+  isDebugPanelOpen.value = true;
+}
+
+function closeDebugPanel() {
+  isDebugPanelOpen.value = false;
 }
 
 function openRTPSettings() {
@@ -356,6 +376,29 @@ header h1 {
   right: 0;
   display: flex;
   gap: 10px;
+}
+
+.debug-button {
+  background: rgba(255, 165, 0, 0.2);
+  color: #ffaa00;
+  border: 2px solid #ffaa00;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.debug-button:hover {
+  background: rgba(255, 165, 0, 0.3);
+  border-color: #ffcc00;
+  color: #ffcc00;
+  transform: scale(1.05);
+}
+
+.debug-button:active {
+  transform: scale(0.95);
 }
 
 .rtp-settings-button {
@@ -639,6 +682,11 @@ header h1 {
   background: rgba(26, 26, 46, 0.98);
   border-radius: 12px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.debug-modal {
+  width: 100%;
+  padding: 0;
 }
 
 .rtp-settings-modal {

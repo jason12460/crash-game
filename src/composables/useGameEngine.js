@@ -2,6 +2,7 @@ import { reactive, ref, onUnmounted } from 'vue';
 import { generateSeed, seedToRandom, hashSeed } from '../utils/randomGenerator.js';
 import { calculateCrashPoint, calculateCurrentMultiplier } from '../utils/crashFormula.js';
 import { useRTPConfig } from './useRTPConfig.js';
+import { useDebugMode } from './useDebugMode.js';
 
 const STORAGE_KEY = 'crashgame_engine';
 
@@ -32,10 +33,14 @@ export function useGameEngine() {
       startTime: 0,
       crashTime: null,
       currentMultiplier: 1.00,
-      elapsedTime: 0
+      elapsedTime: 0,
+      debugMode: false // Whether this round uses debug crash point
     },
     isRunning: false,
-    countdown: 5 // Seconds until next round
+    countdown: 5, // Seconds until next round
+    // Curve parameters for display in debug mode
+    curveExponent: 3,
+    baseSpeedRatio: 0.3
   });
 
   let animationId = null;
@@ -77,9 +82,22 @@ export function useGameEngine() {
 
   async function generateNewRound() {
     const { getRTPFactor } = useRTPConfig();
+    const { getDebugCrashPoint, isDebugActive } = useDebugMode();
+
     const seed = generateSeed();
     const random = seedToRandom(seed);
-    const crashPoint = calculateCrashPoint(random, getRTPFactor());
+
+    // Check if debug mode is active and use debug crash point
+    let crashPoint;
+    let debugMode = false;
+
+    if (isDebugActive()) {
+      crashPoint = getDebugCrashPoint();
+      debugMode = true;
+    } else {
+      crashPoint = calculateCrashPoint(random, getRTPFactor());
+    }
+
     const seedHash = await hashSeed(seed);
 
     const newRoundId = gameState.currentRound.roundId + 1;
@@ -93,7 +111,8 @@ export function useGameEngine() {
       startTime: 0,
       crashTime: null,
       currentMultiplier: 1.00,
-      elapsedTime: 0
+      elapsedTime: 0,
+      debugMode
     };
 
     // Save the new round ID
