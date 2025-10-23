@@ -10,8 +10,14 @@ export default defineConfig({
     }
   },
   server: {
+    host: true,
     port: 3000,
-    open: true
+    open: true,
+    https: false,
+    headers: {
+      'Cross-Origin-Embedder-Policy': 'credentialless',
+      'Cross-Origin-Opener-Policy': 'same-origin'
+    }
   },
   build: {
     target: 'es2020',
