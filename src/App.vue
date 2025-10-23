@@ -41,6 +41,60 @@
               Time: {{ (gameState.currentRound.elapsedTime / 1000).toFixed(1) }}s
             </span>
           </div>
+
+          <!-- Provably Fair Information -->
+          <div class="fairness-info">
+            <div class="fairness-header">
+              <h4>Provably Fair</h4>
+              <button class="verify-btn" @click="openVerifier" title="Open verification tool">
+                🔍 Verify
+              </button>
+            </div>
+
+            <!-- Seed Hash (shown before and during round) -->
+            <div v-if="gameState.currentRound.state !== 'CRASHED'" class="seed-info">
+              <label>Seed Hash (SHA-256):</label>
+              <div class="seed-value">
+                <code>{{ gameState.currentRound.seedHash }}</code>
+                <button
+                  class="copy-btn"
+                  @click="copyToClipboard(gameState.currentRound.seedHash, 'Seed hash copied!')"
+                  title="Copy seed hash"
+                >
+                  📋
+                </button>
+              </div>
+              <p class="hint">This hash is generated before the round starts and proves the outcome was predetermined.</p>
+            </div>
+
+            <!-- Actual Seed (shown after crash) -->
+            <div v-else class="seed-info revealed">
+              <label>Seed Hash (SHA-256):</label>
+              <div class="seed-value">
+                <code>{{ gameState.currentRound.seedHash }}</code>
+                <button
+                  class="copy-btn"
+                  @click="copyToClipboard(gameState.currentRound.seedHash, 'Seed hash copied!')"
+                  title="Copy seed hash"
+                >
+                  📋
+                </button>
+              </div>
+
+              <label class="revealed-label">Revealed Seed:</label>
+              <div class="seed-value">
+                <code class="revealed-seed">{{ gameState.currentRound.seed }}</code>
+                <button
+                  class="copy-btn"
+                  @click="copyToClipboard(gameState.currentRound.seed, 'Seed copied!')"
+                  title="Copy seed"
+                >
+                  📋
+                </button>
+              </div>
+              <p class="hint">Verify this seed produces the hash above using SHA-256.</p>
+            </div>
+          </div>
         </div>
 
         <!-- Betting Panel -->
@@ -69,6 +123,12 @@
       :rtp-factor="rtpConfig.rtpFactor"
       @close="closeSimulator"
     />
+
+    <!-- Fairness Verifier Modal -->
+    <FairnessVerifier
+      :is-open="isVerifierOpen"
+      @close="closeVerifier"
+    />
   </div>
 </template>
 
@@ -80,6 +140,7 @@ import BettingPanel from './components/BettingPanel.vue';
 import GameHistory from './components/GameHistory.vue';
 import RTPSettings from './components/RTPSettings.vue';
 import RTPSimulator from './components/RTPSimulator.vue';
+import FairnessVerifier from './components/FairnessVerifier.vue';
 import { useGameEngine } from './composables/useGameEngine.js';
 import { useBalance } from './composables/useBalance.js';
 import { useGameHistory } from './composables/useGameHistory.js';
@@ -92,6 +153,9 @@ const { rtpConfig } = useRTPConfig();
 
 // RTP Simulator state
 const isSimulatorOpen = ref(false);
+
+// Fairness Verifier state
+const isVerifierOpen = ref(false);
 
 const stateClass = computed(() => {
   return {
@@ -141,6 +205,23 @@ function closeSimulator() {
   isSimulatorOpen.value = false;
 }
 
+function openVerifier() {
+  isVerifierOpen.value = true;
+}
+
+function closeVerifier() {
+  isVerifierOpen.value = false;
+}
+
+function copyToClipboard(text, message = 'Copied!') {
+  navigator.clipboard.writeText(text).then(() => {
+    alert(message);
+  }).catch(err => {
+    console.error('Failed to copy:', err);
+    alert('Failed to copy to clipboard');
+  });
+}
+
 // Watch for state changes to clear bet at the right time
 watch(() => gameState.currentRound.state, (newState, oldState) => {
   // Clear bet when transitioning from CRASHED to BETTING (new round)
@@ -165,6 +246,8 @@ on('roundCrash', (data) => {
   const roundSummary = {
     roundId: data.roundId,
     crashPoint: data.crashPoint,
+    seed: data.seed,
+    seedHash: gameState.currentRound.seedHash,
     timestamp: Date.now(),
     playerBet: balanceState.currentBet ? {
       amountCents: balanceState.currentBet.amountCents,
@@ -341,6 +424,126 @@ header h1 {
   border-radius: 8px;
   color: #aaa;
   font-size: 14px;
+}
+
+.fairness-info {
+  margin-top: 20px;
+  padding: 20px;
+  background: rgba(0, 100, 200, 0.1);
+  border: 1px solid rgba(0, 150, 255, 0.3);
+  border-radius: 8px;
+}
+
+.fairness-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.fairness-info h4 {
+  margin: 0;
+  font-size: 16px;
+  color: #00aaff;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.verify-btn {
+  background: rgba(0, 200, 0, 0.2);
+  border: 1px solid rgba(0, 200, 0, 0.5);
+  color: #00ff00;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: bold;
+  transition: all 0.2s ease;
+}
+
+.verify-btn:hover {
+  background: rgba(0, 200, 0, 0.3);
+  border-color: #00ff00;
+  transform: scale(1.05);
+}
+
+.verify-btn:active {
+  transform: scale(0.95);
+}
+
+.seed-info {
+  margin-bottom: 10px;
+}
+
+.seed-info label {
+  display: block;
+  font-size: 12px;
+  color: #aaa;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+.seed-info .revealed-label {
+  margin-top: 15px;
+  color: #00ff00;
+}
+
+.seed-value {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 10px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.seed-value code {
+  flex: 1;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: #fff;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.seed-value .revealed-seed {
+  color: #00ff00;
+  font-weight: bold;
+}
+
+.copy-btn {
+  background: rgba(0, 150, 255, 0.2);
+  border: 1px solid rgba(0, 150, 255, 0.5);
+  color: #00aaff;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.copy-btn:hover {
+  background: rgba(0, 150, 255, 0.3);
+  border-color: #00aaff;
+  transform: scale(1.05);
+}
+
+.copy-btn:active {
+  transform: scale(0.95);
+}
+
+.seed-info .hint {
+  font-size: 11px;
+  color: #888;
+  font-style: italic;
+  margin: 5px 0 0 0;
+}
+
+.seed-info.revealed {
+  border-left: 3px solid #00ff00;
+  padding-left: 15px;
 }
 
 @media (max-width: 768px) {

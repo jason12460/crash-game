@@ -34,6 +34,45 @@
             No bet
           </div>
         </div>
+
+        <!-- Provably Fair Info (expandable) -->
+        <div v-if="expandedRound === round.roundId" class="fairness-details">
+          <div class="seed-item">
+            <label>Seed Hash:</label>
+            <div class="seed-display">
+              <code>{{ round.seedHash }}</code>
+              <button
+                class="copy-icon"
+                @click.stop="copyToClipboard(round.seedHash)"
+                title="Copy seed hash"
+              >
+                📋
+              </button>
+            </div>
+          </div>
+          <div class="seed-item">
+            <label>Seed:</label>
+            <div class="seed-display">
+              <code class="seed-value">{{ round.seed }}</code>
+              <button
+                class="copy-icon"
+                @click.stop="copyToClipboard(round.seed)"
+                title="Copy seed"
+              >
+                📋
+              </button>
+            </div>
+          </div>
+          <p class="verify-hint">Use SHA-256 to verify the seed produces the hash above.</p>
+        </div>
+
+        <!-- Toggle button -->
+        <button
+          class="toggle-fairness"
+          @click="toggleExpand(round.roundId)"
+        >
+          {{ expandedRound === round.roundId ? 'Hide' : 'Show' }} Provably Fair Data
+        </button>
       </div>
     </div>
 
@@ -44,7 +83,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { formatCurrency } from '../utils/currency.js';
 
 const props = defineProps({
@@ -59,9 +98,28 @@ const props = defineProps({
   }
 });
 
+const expandedRound = ref(null);
+
 const displayRounds = computed(() => {
   return props.rounds.slice(0, props.maxDisplay);
 });
+
+function toggleExpand(roundId) {
+  if (expandedRound.value === roundId) {
+    expandedRound.value = null;
+  } else {
+    expandedRound.value = roundId;
+  }
+}
+
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    // Could add a toast notification here instead of alert
+    console.log('Copied to clipboard:', text.substring(0, 10) + '...');
+  }).catch(err => {
+    console.error('Failed to copy:', err);
+  });
+}
 
 function getResultClass(round) {
   if (!round.playerBet) return 'no-bet-class';
@@ -234,5 +292,95 @@ h3 {
 
 .history-list::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
+}
+
+.toggle-fairness {
+  width: 100%;
+  margin-top: 10px;
+  padding: 6px 12px;
+  background: rgba(0, 150, 255, 0.1);
+  border: 1px solid rgba(0, 150, 255, 0.3);
+  color: #00aaff;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: bold;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.toggle-fairness:hover {
+  background: rgba(0, 150, 255, 0.2);
+  border-color: #00aaff;
+}
+
+.fairness-details {
+  margin-top: 12px;
+  padding: 12px;
+  background: rgba(0, 100, 200, 0.1);
+  border: 1px solid rgba(0, 150, 255, 0.2);
+  border-radius: 6px;
+}
+
+.seed-item {
+  margin-bottom: 10px;
+}
+
+.seed-item:last-of-type {
+  margin-bottom: 5px;
+}
+
+.seed-item label {
+  display: block;
+  font-size: 10px;
+  color: #aaa;
+  margin-bottom: 4px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.seed-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 6px 8px;
+  border-radius: 4px;
+}
+
+.seed-display code {
+  flex: 1;
+  font-family: 'Courier New', monospace;
+  font-size: 9px;
+  color: #fff;
+  word-break: break-all;
+  line-height: 1.3;
+}
+
+.seed-display .seed-value {
+  color: #00ff00;
+}
+
+.copy-icon {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px;
+  opacity: 0.6;
+  transition: opacity 0.2s ease;
+  flex-shrink: 0;
+}
+
+.copy-icon:hover {
+  opacity: 1;
+}
+
+.verify-hint {
+  font-size: 9px;
+  color: #888;
+  font-style: italic;
+  margin: 8px 0 0 0;
 }
 </style>
