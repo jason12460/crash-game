@@ -62,13 +62,19 @@ onMounted(() => {
       scales: {
         x: {
           type: 'linear',
+          min: 0,
+          max: 10,
           title: {
             display: true,
             text: 'Time (s)',
             color: '#fff'
           },
           ticks: {
-            color: '#fff'
+            color: '#fff',
+            stepSize: 10,
+            callback: function(value) {
+              return value.toFixed(0);
+            }
           },
           grid: {
             color: 'rgba(255, 255, 255, 0.1)'
@@ -78,6 +84,7 @@ onMounted(() => {
           type: 'linear',
           beginAtZero: false,
           min: 1.0,
+          max: 2.0,
           title: {
             display: true,
             text: 'Multiplier',
@@ -85,8 +92,9 @@ onMounted(() => {
           },
           ticks: {
             color: '#fff',
+            stepSize: 0.2,
             callback: function(value) {
-              return value.toFixed(2) + 'x';
+              return value.toFixed(1) + 'x';
             }
           },
           grid: {
@@ -113,6 +121,14 @@ watch(() => props.state, (newState) => {
     dataPoints.length = 0;
     timePoints.length = 0;
     startTime = Date.now();
+
+    // Reset axes to minimum range
+    if (chart) {
+      chart.options.scales.x.min = 0;
+      chart.options.scales.x.max = 10;
+      chart.options.scales.y.min = 1.0;
+      chart.options.scales.y.max = 2.0;
+    }
   } else if (newState === 'CRASHED') {
     // Turn line red when crashed
     if (chart) {
@@ -125,6 +141,13 @@ watch(() => props.state, (newState) => {
       chart.data.datasets[0].borderColor = '#00ff00';
       dataPoints.length = 0;
       timePoints.length = 0;
+
+      // Reset axes to minimum range
+      chart.options.scales.x.min = 0;
+      chart.options.scales.x.max = 10;
+      chart.options.scales.y.min = 1.0;
+      chart.options.scales.y.max = 2.0;
+
       chart.update('none');
     }
   }
@@ -134,17 +157,35 @@ watch(() => props.state, (newState) => {
 watch(() => props.currentMultiplier, (newMultiplier) => {
   if (props.state === 'RUNNING' && chart && startTime) {
     const elapsedSeconds = (Date.now() - startTime) / 1000;
-    
+
     // Add new data point
     timePoints.push(elapsedSeconds);
     dataPoints.push(newMultiplier);
-    
+
+    // Dynamically adjust X-axis range
+    // Always start from 0, minimum 10 seconds, continuously update as time grows
+    const currentMaxX = chart.options.scales.x.max;
+    if (elapsedSeconds > currentMaxX * 0.8) {
+      // Continuously expand X-axis to keep current time at ~80% of range
+      // Add some padding (20%) ahead of current time
+      chart.options.scales.x.max = Math.max(currentMaxX, elapsedSeconds * 1.2);
+    }
+
+    // Dynamically adjust Y-axis range
+    // Start at 1.0-2.0, continuously update max as multiplier grows
+    const currentMaxY = chart.options.scales.y.max;
+    if (newMultiplier > currentMaxY * 0.8) {
+      // Continuously expand Y-axis to keep current multiplier at ~80% of range
+      // Add some padding (20%) above current multiplier
+      chart.options.scales.y.max = Math.max(currentMaxY, newMultiplier * 1.2);
+    }
+
     // Limit data points to last 200 for performance
     if (dataPoints.length > 200) {
       dataPoints.shift();
       timePoints.shift();
     }
-    
+
     // Update chart
     chart.update('none'); // 'none' mode = no animation for better performance
   }

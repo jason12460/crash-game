@@ -30,18 +30,19 @@ export function calculateCurrentMultiplier(elapsedMs, crashPoint) {
     return 1.00;
   }
 
-  // Speed: 1 second per 1.0x increase (1000ms per multiplier point)
-  const msPerMultiplier = 1000;
+  // Speed: 10 seconds per 1.0x increase (10000ms per multiplier point)
+  const msPerMultiplier = 10000;
   const timeToCrash = (crashPoint - 1.00) * msPerMultiplier;
 
   if (elapsedMs >= timeToCrash) {
     return crashPoint;
   }
 
-  // Linear progression from 1.00 to crashPoint
-  const progress = elapsedMs / timeToCrash;
-  const multiplier = 1.00 + (crashPoint - 1.00) * progress;
-  
+  // More gradual progression: starts slower, accelerates more gently
+  // Using linear easing for more predictable growth
+  const linearProgress = elapsedMs / timeToCrash;
+  const multiplier = 1.00 + (crashPoint - 1.00) * linearProgress;
+
   // Round to 2 decimal places for display
   return Math.round(multiplier * 100) / 100;
 }

@@ -62,7 +62,7 @@
 </template>
 
 <script setup>
-import { onMounted, computed } from 'vue';
+import { onMounted, computed, watch } from 'vue';
 import GameGraph from './components/GameGraph.vue';
 import BalanceDisplay from './components/BalanceDisplay.vue';
 import BettingPanel from './components/BettingPanel.vue';
@@ -97,10 +97,18 @@ function handleCashOut() {
   }
 }
 
+// Watch for state changes to clear bet at the right time
+watch(() => gameState.currentRound.state, (newState, oldState) => {
+  // Clear bet when transitioning from CRASHED to BETTING (new round)
+  if (oldState === 'CRASHED' && newState === 'BETTING') {
+    clearCurrentBet();
+  }
+});
+
 // Listen to game events
 on('roundStart', () => {
-  // Clear previous bet when new round starts
-  clearCurrentBet();
+  // Don't clear bet here - it should persist from BETTING to RUNNING phase
+  // Bet is only cleared when new BETTING phase starts (see watcher above)
 });
 
 on('roundCrash', (data) => {
