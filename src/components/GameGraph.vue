@@ -116,14 +116,14 @@ watch(() => props.state, (newState) => {
   if (newState === 'RUNNING') {
     // Reset data when round starts
     startTime = Date.now();
-    timeData = [];
-    multiplierData = [];
+    timeData = [0];  // 從時間 0 開始
+    multiplierData = [1.0];  // 從倍率 1.0 開始
     currentXRange = [0, 10];
     currentYRange = [1.0, 2.0];
 
     if (chart) {
-      // 清空數據
-      chart.setData([[], []]);
+      // 設置初始數據點 (0, 1.0)
+      chart.setData([[0], [1.0]]);
     }
   } else if (newState === 'CRASHED') {
     // Turn line red when crashed
