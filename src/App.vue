@@ -1,0 +1,284 @@
+<template>
+  <div id="app">
+    <header>
+      <h1>Crash Game</h1>
+      <p class="tagline">Watch the multiplier rise... cash out before it crashes!</p>
+    </header>
+
+    <main>
+      <!-- Balance Display -->
+      <BalanceDisplay :balance-cents="balanceState.balanceCents" />
+
+      <div class="game-layout">
+        <div class="game-container">
+          <!-- Current Multiplier Display -->
+          <div class="multiplier-display" :class="stateClass">
+            <div v-if="gameState.currentRound.state === 'BETTING'" class="betting-state">
+              <h2>Waiting for round...</h2>
+              <p class="countdown">Starting in {{ gameState.countdown }}s</p>
+            </div>
+            <div v-else-if="gameState.currentRound.state === 'RUNNING'" class="running-state">
+              <h2 class="current-multiplier">{{ gameState.currentRound.currentMultiplier.toFixed(2) }}x</h2>
+            </div>
+            <div v-else-if="gameState.currentRound.state === 'CRASHED'" class="crashed-state">
+              <h2 class="crash-multiplier">{{ gameState.currentRound.crashPoint.toFixed(2) }}x</h2>
+              <p class="crash-message">CRASHED!</p>
+            </div>
+          </div>
+
+          <!-- Game Graph -->
+          <GameGraph
+            :current-multiplier="gameState.currentRound.currentMultiplier"
+            :crash-point="gameState.currentRound.crashPoint"
+            :state="gameState.currentRound.state"
+          />
+
+          <!-- Round Info -->
+          <div class="round-info">
+            <span>Round #{{ gameState.currentRound.roundId }}</span>
+            <span v-if="gameState.currentRound.state === 'RUNNING'">
+              Time: {{ (gameState.currentRound.elapsedTime / 1000).toFixed(1) }}s
+            </span>
+          </div>
+        </div>
+
+        <!-- Betting Panel -->
+        <div class="betting-container">
+          <BettingPanel
+            :balance-cents="balanceState.balanceCents"
+            :state="gameState.currentRound.state"
+            :current-multiplier="gameState.currentRound.currentMultiplier"
+            :current-bet="balanceState.currentBet"
+            @place-bet="handlePlaceBet"
+            @cash-out="handleCashOut"
+          />
+        </div>
+      </div>
+
+      <!-- Game History -->
+      <GameHistory :rounds="historyState.rounds" :max-display="20" />
+    </main>
+  </div>
+</template>
+
+<script setup>
+import { onMounted, computed } from 'vue';
+import GameGraph from './components/GameGraph.vue';
+import BalanceDisplay from './components/BalanceDisplay.vue';
+import BettingPanel from './components/BettingPanel.vue';
+import GameHistory from './components/GameHistory.vue';
+import { useGameEngine } from './composables/useGameEngine.js';
+import { useBalance } from './composables/useBalance.js';
+import { useGameHistory } from './composables/useGameHistory.js';
+
+const { gameState, init, cleanup, on } = useGameEngine();
+const { balanceState, placeBet, cashOut, loseBet, clearCurrentBet } = useBalance();
+const { historyState, addRound } = useGameHistory();
+
+const stateClass = computed(() => {
+  return {
+    'state-betting': gameState.currentRound.state === 'BETTING',
+    'state-running': gameState.currentRound.state === 'RUNNING',
+    'state-crashed': gameState.currentRound.state === 'CRASHED'
+  };
+});
+
+function handlePlaceBet(amountCents) {
+  const result = placeBet(amountCents, gameState.currentRound.roundId);
+  if (!result.success) {
+    alert(result.error);
+  }
+}
+
+function handleCashOut() {
+  const result = cashOut(gameState.currentRound.currentMultiplier);
+  if (!result.success) {
+    alert(result.error);
+  }
+}
+
+// Listen to game events
+on('roundStart', () => {
+  // Clear previous bet when new round starts
+  clearCurrentBet();
+});
+
+on('roundCrash', (data) => {
+  // Handle bet loss if player didn't cash out
+  if (balanceState.currentBet && balanceState.currentBet.status === 'ACTIVE') {
+    loseBet();
+  }
+
+  // Add round to history
+  const roundSummary = {
+    roundId: data.roundId,
+    crashPoint: data.crashPoint,
+    timestamp: Date.now(),
+    playerBet: balanceState.currentBet ? {
+      amountCents: balanceState.currentBet.amountCents,
+      cashOutMultiplier: balanceState.currentBet.cashOutMultiplier,
+      winningsCents: balanceState.currentBet.winningsCents,
+      status: balanceState.currentBet.status
+    } : null
+  };
+
+  addRound(roundSummary);
+});
+
+onMounted(() => {
+  init();
+});
+</script>
+
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  color: #ffffff;
+  min-height: 100vh;
+}
+
+#app {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+header h1 {
+  font-size: 48px;
+  font-weight: bold;
+  background: linear-gradient(45deg, #00ff00, #00aa00);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 10px;
+}
+
+.tagline {
+  color: #aaa;
+  font-size: 18px;
+}
+
+.game-layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.game-container {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  padding: 30px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.betting-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.multiplier-display {
+  text-align: center;
+  padding: 40px;
+  margin-bottom: 30px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.state-betting {
+  background: rgba(100, 100, 100, 0.2);
+}
+
+.state-running {
+  background: rgba(0, 255, 0, 0.1);
+}
+
+.state-crashed {
+  background: rgba(255, 0, 0, 0.2);
+}
+
+.betting-state h2 {
+  color: #aaa;
+  font-size: 32px;
+  margin-bottom: 10px;
+}
+
+.countdown {
+  font-size: 24px;
+  color: #00ff00;
+  font-weight: bold;
+}
+
+.running-state .current-multiplier {
+  font-size: 72px;
+  font-weight: bold;
+  color: #00ff00;
+  text-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+.crashed-state .crash-multiplier {
+  font-size: 72px;
+  font-weight: bold;
+  color: #ff0000;
+  text-shadow: 0 0 20px rgba(255, 0, 0, 0.5);
+}
+
+.crash-message {
+  font-size: 32px;
+  color: #ff0000;
+  font-weight: bold;
+  margin-top: 10px;
+}
+
+.round-info {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+  padding: 15px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  color: #aaa;
+  font-size: 14px;
+}
+
+@media (max-width: 768px) {
+  header h1 {
+    font-size: 36px;
+  }
+
+  .game-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .running-state .current-multiplier,
+  .crashed-state .crash-multiplier {
+    font-size: 48px;
+  }
+
+  .game-container {
+    padding: 15px;
+  }
+}
+</style>
