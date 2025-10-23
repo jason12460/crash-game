@@ -1,6 +1,7 @@
 import { reactive, ref, onUnmounted } from 'vue';
 import { generateSeed, seedToRandom, hashSeed } from '../utils/randomGenerator.js';
 import { calculateCrashPoint, calculateCurrentMultiplier } from '../utils/crashFormula.js';
+import { useRTPConfig } from './useRTPConfig.js';
 
 const STORAGE_KEY = 'crashgame_engine';
 
@@ -75,9 +76,10 @@ export function useGameEngine() {
   }
 
   async function generateNewRound() {
+    const { getRTPFactor } = useRTPConfig();
     const seed = generateSeed();
     const random = seedToRandom(seed);
-    const crashPoint = calculateCrashPoint(random);
+    const crashPoint = calculateCrashPoint(random, getRTPFactor());
     const seedHash = await hashSeed(seed);
 
     const newRoundId = gameState.currentRound.roundId + 1;

@@ -56,6 +56,9 @@
         </div>
       </div>
 
+      <!-- RTP Settings -->
+      <RTPSettings />
+
       <!-- Game History -->
       <GameHistory :rounds="historyState.rounds" :max-display="20" />
     </main>
@@ -68,6 +71,7 @@ import GameGraph from './components/GameGraph.vue';
 import BalanceDisplay from './components/BalanceDisplay.vue';
 import BettingPanel from './components/BettingPanel.vue';
 import GameHistory from './components/GameHistory.vue';
+import RTPSettings from './components/RTPSettings.vue';
 import { useGameEngine } from './composables/useGameEngine.js';
 import { useBalance } from './composables/useBalance.js';
 import { useGameHistory } from './composables/useGameHistory.js';

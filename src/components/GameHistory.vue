@@ -10,7 +10,7 @@
     <div v-else class="history-list">
       <div
         v-for="round in displayRounds"
-        :key="round.roundId"
+        :key="`${round.roundId}-${round.timestamp}`"
         class="history-item"
         :class="getResultClass(round)"
       >
