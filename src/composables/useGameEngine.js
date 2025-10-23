@@ -135,7 +135,12 @@ export function useGameEngine() {
     const elapsedMs = now - gameState.currentRound.startTime;
     gameState.currentRound.elapsedTime = elapsedMs;
 
-    const multiplier = calculateCurrentMultiplier(elapsedMs, gameState.currentRound.crashPoint);
+    // Adjust acceleration curve:
+    // CURVE_EXPONENT: 1.0 = linear, 2.0 = moderate, 3.0 = strong, higher = more dramatic
+    // BASE_SPEED_RATIO: 0.0 = pure exponential, 0.3 = recommended, 1.0 = pure linear
+    const CURVE_EXPONENT = 2.0;
+    const BASE_SPEED_RATIO = 0.3;  // 30% linear base speed + 70% exponential acceleration
+    const multiplier = calculateCurrentMultiplier(elapsedMs, gameState.currentRound.crashPoint, CURVE_EXPONENT, BASE_SPEED_RATIO);
     gameState.currentRound.currentMultiplier = multiplier;
 
     emit('multiplierUpdate', {
