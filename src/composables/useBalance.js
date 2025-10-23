@@ -66,19 +66,20 @@ export function useBalance() {
       };
     }
 
-    // Check if player has enough balance
+    // If there's an existing bet for this round, refund it first
+    let refundAmount = 0;
+    if (balanceState.currentBet &&
+        balanceState.currentBet.roundId === roundId &&
+        balanceState.currentBet.status === 'ACTIVE') {
+      refundAmount = balanceState.currentBet.amountCents;
+      balanceState.balanceCents += refundAmount;
+    }
+
+    // Check if player has enough balance (after refund if any)
     if (balanceState.balanceCents < amountCents) {
       return {
         success: false,
         error: 'Insufficient balance'
-      };
-    }
-
-    // Check if bet already placed
-    if (balanceState.currentBet && balanceState.currentBet.status === 'ACTIVE') {
-      return {
-        success: false,
-        error: 'Bet already placed for this round'
       };
     }
 
@@ -177,6 +178,40 @@ export function useBalance() {
     saveBalance();
   }
 
+  // Cancel current bet and refund
+  function cancelBet() {
+    if (!balanceState.currentBet) {
+      return {
+        success: false,
+        error: 'No bet to cancel'
+      };
+    }
+
+    // Refund the bet amount
+    const refundAmount = balanceState.currentBet.amountCents;
+    balanceState.balanceCents += refundAmount;
+
+    // Record transaction
+    balanceState.transactions.push({
+      type: 'CANCEL',
+      amountCents: refundAmount,
+      balanceAfterCents: balanceState.balanceCents,
+      roundId: balanceState.currentBet.roundId,
+      timestamp: Date.now()
+    });
+
+    // Clear the bet
+    balanceState.currentBet = null;
+
+    saveBalance();
+
+    return {
+      success: true,
+      refundedAmount: refundAmount,
+      newBalance: balanceState.balanceCents
+    };
+  }
+
   // Clear current bet (called when new round starts)
   function clearCurrentBet() {
     balanceState.currentBet = null;
@@ -213,6 +248,7 @@ export function useBalance() {
     balanceState,
     placeBet,
     cashOut,
+    cancelBet,
     loseBet,
     clearCurrentBet,
     canPlaceBet,

@@ -55,6 +55,7 @@
             :current-bet="balanceState.currentBet"
             @place-bet="handlePlaceBet"
             @cash-out="handleCashOut"
+            @cancel-bet="handleCancelBet"
           />
 
           <!-- Provably Fair Information -->
@@ -159,7 +160,7 @@ import { useGameHistory } from './composables/useGameHistory.js';
 import { useRTPConfig } from './composables/useRTPConfig.js';
 
 const { gameState, init, cleanup, on } = useGameEngine();
-const { balanceState, placeBet, cashOut, loseBet, clearCurrentBet, resetBalance } = useBalance();
+const { balanceState, placeBet, cashOut, cancelBet, loseBet, clearCurrentBet, resetBalance } = useBalance();
 const { historyState, addRound, clearHistory } = useGameHistory();
 const { rtpConfig } = useRTPConfig();
 
@@ -193,6 +194,13 @@ function handlePlaceBet(amountCents) {
 
 function handleCashOut() {
   const result = cashOut(gameState.currentRound.currentMultiplier);
+  if (!result.success) {
+    alert(result.error);
+  }
+}
+
+function handleCancelBet() {
+  const result = cancelBet();
   if (!result.success) {
     alert(result.error);
   }

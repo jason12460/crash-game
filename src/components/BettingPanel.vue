@@ -4,6 +4,29 @@
     <div v-if="state === 'BETTING'" class="betting-phase">
       <div class="bet-input-group">
         <label for="bet-amount">Bet Amount</label>
+        <div class="quick-bet-buttons">
+          <button
+            class="btn-quick-bet"
+            :class="{ active: currentBet && currentBet.amountCents === 100 }"
+            @click="setQuickBet(1)"
+          >
+            $1
+          </button>
+          <button
+            class="btn-quick-bet"
+            :class="{ active: currentBet && currentBet.amountCents === 500 }"
+            @click="setQuickBet(5)"
+          >
+            $5
+          </button>
+          <button
+            class="btn-quick-bet"
+            :class="{ active: currentBet && currentBet.amountCents === 1000 }"
+            @click="setQuickBet(10)"
+          >
+            $10
+          </button>
+        </div>
         <div class="input-wrapper">
           <span class="currency-symbol">$</span>
           <input
@@ -14,18 +37,27 @@
             max="1000"
             step="1"
             placeholder="0.00"
-            :disabled="!!currentBet"
           />
         </div>
       </div>
 
-      <button
-        class="btn btn-place-bet"
-        :disabled="!canBet || !!currentBet"
-        @click="handlePlaceBet"
-      >
-        {{ currentBet ? 'Bet Placed' : 'Place Bet' }}
-      </button>
+      <div class="button-group">
+        <button
+          class="btn btn-place-bet"
+          :disabled="!canBet"
+          @click="handlePlaceBet"
+        >
+          {{ currentBet ? 'Update Bet' : 'Place Bet' }}
+        </button>
+        <button
+          v-if="currentBet"
+          class="btn btn-cancel"
+          @click="handleCancelBet"
+          title="取消下注"
+        >
+          Cancel
+        </button>
+      </div>
 
       <div v-if="errorMessage" class="error-message">
         {{ errorMessage }}
@@ -104,7 +136,7 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(['placeBet', 'cashOut']);
+const emit = defineEmits(['placeBet', 'cashOut', 'cancelBet']);
 
 const betInput = ref('');
 const errorMessage = ref('');
@@ -123,6 +155,14 @@ const potentialWinnings = computed(() => {
   return Math.floor(props.currentBet.amountCents * props.currentMultiplier);
 });
 
+function setQuickBet(amount) {
+  betInput.value = amount.toString();
+  // 如果已經有下注且在下注階段，則會更新下注
+  if (props.state === 'BETTING') {
+    handlePlaceBet();
+  }
+}
+
 function handlePlaceBet() {
   try {
     const betCents = dollarsToCents(betInput.value);
@@ -135,6 +175,12 @@ function handlePlaceBet() {
 
 function handleCashOut() {
   emit('cashOut');
+}
+
+function handleCancelBet() {
+  emit('cancelBet');
+  betInput.value = '';
+  errorMessage.value = '';
 }
 
 // Watch for state changes to track results
@@ -193,6 +239,46 @@ watch(() => props.state, (newState, oldState) => {
   letter-spacing: 1px;
 }
 
+.quick-bet-buttons {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.btn-quick-bet {
+  flex: 1;
+  padding: 10px 15px;
+  font-size: 16px;
+  font-weight: bold;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #aaa;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+}
+
+.btn-quick-bet:hover:not(:disabled) {
+  border-color: #00ff00;
+  color: #00ff00;
+  background: rgba(0, 255, 0, 0.1);
+  box-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+  transform: translateY(-2px);
+}
+
+.btn-quick-bet.active {
+  border-color: #00ff00;
+  color: #00ff00;
+  background: rgba(0, 255, 0, 0.15);
+  box-shadow: 0 0 15px rgba(0, 255, 0, 0.4);
+}
+
+.btn-quick-bet:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .input-wrapper {
   position: relative;
   display: flex;
@@ -229,8 +315,14 @@ watch(() => props.state, (newState, oldState) => {
   cursor: not-allowed;
 }
 
-.btn {
+.button-group {
+  display: flex;
+  gap: 10px;
   width: 100%;
+}
+
+.btn {
+  min-width: 0;
   padding: 18px;
   font-size: 18px;
   font-weight: bold;
@@ -248,6 +340,7 @@ watch(() => props.state, (newState, oldState) => {
 }
 
 .btn-place-bet {
+  flex: 3;
   background: linear-gradient(45deg, #00aa00, #00ff00);
   color: #000;
 }
@@ -297,6 +390,20 @@ watch(() => props.state, (newState, oldState) => {
   border-radius: 4px;
   color: #00ff00;
   text-align: center;
+}
+
+.btn-cancel {
+  flex: 1;
+  padding: 18px 8px;
+  font-size: 15px;
+  background: linear-gradient(45deg, #cc0000, #ff0000);
+  color: white;
+}
+
+.btn-cancel:hover:not(:disabled) {
+  background: linear-gradient(45deg, #ff0000, #cc0000);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 0, 0, 0.4);
 }
 
 .active-bet {
