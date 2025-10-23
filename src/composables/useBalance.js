@@ -4,17 +4,22 @@ import { calculateWinnings, validateBetAmount } from '../utils/currency.js';
 const STORAGE_KEY = 'crashgame_balance';
 const DEFAULT_BALANCE = 100000; // $1000.00 in cents
 
+// Singleton state - shared across all instances
+const balanceState = reactive({
+  balanceCents: DEFAULT_BALANCE,
+  currentBet: null, // PlayerBet object or null
+  transactions: []
+});
+
+// Track if we've already loaded
+let isLoaded = false;
+
 /**
  * Balance Management Composable
  * Manages player balance, bet placement, and cash-out operations
+ * Uses singleton pattern to ensure shared state
  */
 export function useBalance() {
-  const balanceState = reactive({
-    balanceCents: DEFAULT_BALANCE,
-    currentBet: null, // PlayerBet object or null
-    transactions: []
-  });
-
   // Load balance from localStorage
   function loadBalance() {
     try {
@@ -24,8 +29,10 @@ export function useBalance() {
         balanceState.balanceCents = data.balanceCents || DEFAULT_BALANCE;
         balanceState.transactions = data.transactions || [];
       }
+      isLoaded = true;
     } catch (error) {
       console.error('Failed to load balance:', error);
+      isLoaded = true;
     }
   }
 
@@ -197,8 +204,10 @@ export function useBalance() {
     saveBalance();
   }
 
-  // Initialize
-  loadBalance();
+  // Initialize only once
+  if (!isLoaded) {
+    loadBalance();
+  }
 
   return {
     balanceState,

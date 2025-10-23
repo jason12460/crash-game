@@ -3,16 +3,21 @@ import { reactive } from 'vue';
 const STORAGE_KEY = 'crashgame_history';
 const MAX_RECORDS = 50;
 
+// Singleton state - shared across all instances
+const historyState = reactive({
+  rounds: [], // Array of GameRoundSummary
+  maxRecords: MAX_RECORDS
+});
+
+// Track if we've already loaded
+let isLoaded = false;
+
 /**
  * Game History Composable
  * Manages history of completed rounds with persistence
+ * Uses singleton pattern to ensure shared state
  */
 export function useGameHistory() {
-  const historyState = reactive({
-    rounds: [], // Array of GameRoundSummary
-    maxRecords: MAX_RECORDS
-  });
-
   // Load history from localStorage
   function loadHistory() {
     try {
@@ -21,8 +26,10 @@ export function useGameHistory() {
         const data = JSON.parse(stored);
         historyState.rounds = data.rounds || [];
       }
+      isLoaded = true;
     } catch (error) {
       console.error('Failed to load history:', error);
+      isLoaded = true;
     }
   }
 
@@ -68,8 +75,10 @@ export function useGameHistory() {
     saveHistory();
   }
 
-  // Initialize
-  loadHistory();
+  // Initialize only once
+  if (!isLoaded) {
+    loadHistory();
+  }
 
   return {
     historyState,

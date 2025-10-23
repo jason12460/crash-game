@@ -2,14 +2,28 @@ import { reactive, ref, onUnmounted } from 'vue';
 import { generateSeed, seedToRandom, hashSeed } from '../utils/randomGenerator.js';
 import { calculateCrashPoint, calculateCurrentMultiplier } from '../utils/crashFormula.js';
 
+const STORAGE_KEY = 'crashgame_engine';
+
 /**
  * Game Engine Composable
  * Manages game round lifecycle, multiplier calculation, and crash logic
  */
 export function useGameEngine() {
+  // Load last round ID from localStorage
+  let lastRoundId = 0;
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      const data = JSON.parse(stored);
+      lastRoundId = data.lastRoundId || 0;
+    }
+  } catch (error) {
+    console.error('Failed to load game engine state:', error);
+  }
+
   const gameState = reactive({
     currentRound: {
-      roundId: 0,
+      roundId: lastRoundId,
       seed: '',
       seedHash: '',
       crashPoint: 0,
@@ -50,14 +64,26 @@ export function useGameEngine() {
     }
   }
 
+  // Save round ID to localStorage
+  function saveRoundId(roundId) {
+    try {
+      const data = { lastRoundId: roundId };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch (error) {
+      console.error('Failed to save round ID:', error);
+    }
+  }
+
   async function generateNewRound() {
     const seed = generateSeed();
     const random = seedToRandom(seed);
     const crashPoint = calculateCrashPoint(random);
     const seedHash = await hashSeed(seed);
 
+    const newRoundId = gameState.currentRound.roundId + 1;
+
     gameState.currentRound = {
-      roundId: gameState.currentRound.roundId + 1,
+      roundId: newRoundId,
       seed,
       seedHash,
       crashPoint,
@@ -67,6 +93,9 @@ export function useGameEngine() {
       currentMultiplier: 1.00,
       elapsedTime: 0
     };
+
+    // Save the new round ID
+    saveRoundId(newRoundId);
 
     startCountdown();
   }
@@ -161,12 +190,32 @@ export function useGameEngine() {
     gameState.isRunning = false;
   }
 
+  // Reset round ID and game state
+  function resetGame() {
+    // Stop current round
+    cleanup();
+
+    // Clear the localStorage completely to ensure clean reset
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch (error) {
+      console.error('Failed to clear game engine state:', error);
+    }
+
+    // Reset round ID to 0 (next round will be #1)
+    gameState.currentRound.roundId = 0;
+
+    // Restart the game
+    init();
+  }
+
   onUnmounted(cleanup);
 
   return {
     gameState,
     init,
     cleanup,
+    resetGame,
     on,
     off
   };

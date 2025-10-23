@@ -180,11 +180,9 @@ watch(() => props.currentMultiplier, (newMultiplier) => {
       chart.options.scales.y.max = Math.max(currentMaxY, newMultiplier * 1.2);
     }
 
-    // Limit data points to last 200 for performance
-    if (dataPoints.length > 200) {
-      dataPoints.shift();
-      timePoints.shift();
-    }
+    // Keep all data points to show complete history from time 0
+    // Note: For very long games, consider increasing the limit or implementing
+    // a more sophisticated data management strategy
 
     // Update chart
     chart.update('none'); // 'none' mode = no animation for better performance

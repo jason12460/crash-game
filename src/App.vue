@@ -3,6 +3,7 @@
     <header>
       <h1>Crash Game</h1>
       <p class="tagline">Watch the multiplier rise... cash out before it crashes!</p>
+      <button class="reset-button" @click="handleReset">Reset Game</button>
     </header>
 
     <main>
@@ -72,8 +73,8 @@ import { useBalance } from './composables/useBalance.js';
 import { useGameHistory } from './composables/useGameHistory.js';
 
 const { gameState, init, cleanup, on } = useGameEngine();
-const { balanceState, placeBet, cashOut, loseBet, clearCurrentBet } = useBalance();
-const { historyState, addRound } = useGameHistory();
+const { balanceState, placeBet, cashOut, loseBet, clearCurrentBet, resetBalance } = useBalance();
+const { historyState, addRound, clearHistory } = useGameHistory();
 
 const stateClass = computed(() => {
   return {
@@ -94,6 +95,24 @@ function handleCashOut() {
   const result = cashOut(gameState.currentRound.currentMultiplier);
   if (!result.success) {
     alert(result.error);
+  }
+}
+
+function handleReset() {
+  if (confirm('Are you sure you want to reset all game data? This will clear your balance and game history.')) {
+    // Clear all game-related localStorage
+    resetBalance();
+    clearHistory();
+
+    // Clear game engine state
+    try {
+      localStorage.removeItem('crashgame_engine');
+    } catch (error) {
+      console.error('Failed to clear game engine state:', error);
+    }
+
+    // Reload the page to ensure a clean state
+    window.location.reload();
   }
 }
 
@@ -161,6 +180,7 @@ body {
 header {
   text-align: center;
   margin-bottom: 30px;
+  position: relative;
 }
 
 header h1 {
@@ -176,6 +196,33 @@ header h1 {
 .tagline {
   color: #aaa;
   font-size: 18px;
+  margin-bottom: 15px;
+}
+
+.reset-button {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: rgba(255, 0, 0, 0.2);
+  color: #ff6666;
+  border: 2px solid #ff6666;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.reset-button:hover {
+  background: rgba(255, 0, 0, 0.3);
+  border-color: #ff4444;
+  color: #ff4444;
+  transform: scale(1.05);
+}
+
+.reset-button:active {
+  transform: scale(0.95);
 }
 
 .game-layout {
