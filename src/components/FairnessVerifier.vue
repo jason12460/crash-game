@@ -107,6 +107,11 @@
           </ol>
         </div>
       </div>
+
+      <!-- Toast Notification -->
+      <div v-if="toastVisible" class="toast">
+        {{ toastMessage }}
+      </div>
     </div>
   </div>
 </template>
@@ -132,6 +137,8 @@ const seed = ref('');
 const calculatedHash = ref('');
 const expectedHash = ref('');
 const calculatedCrashPoint = ref(null);
+const toastMessage = ref('');
+const toastVisible = ref(false);
 
 const isValidSeed = computed(() => {
   return /^[0-9a-fA-F]{32}$/.test(seed.value);
@@ -155,7 +162,6 @@ async function calculateHash() {
     calculatedHash.value = await hashSeed(seed.value);
   } catch (error) {
     console.error('Failed to calculate hash:', error);
-    alert('Failed to calculate hash. Please try again.');
   }
 }
 
@@ -168,15 +174,23 @@ function calculateCrashPointFromSeed() {
     calculatedCrashPoint.value = crashPoint;
   } catch (error) {
     console.error('Failed to calculate crash point:', error);
-    alert('Failed to calculate crash point. Please try again.');
   }
+}
+
+function showToast(message) {
+  toastMessage.value = message;
+  toastVisible.value = true;
+  setTimeout(() => {
+    toastVisible.value = false;
+  }, 2000);
 }
 
 function copyToClipboard(text) {
   navigator.clipboard.writeText(text).then(() => {
-    console.log('Copied to clipboard');
+    showToast('Copied!');
   }).catch(err => {
     console.error('Failed to copy:', err);
+    showToast('Failed to copy');
   });
 }
 
@@ -466,5 +480,32 @@ function close() {
 
 .modal-content::-webkit-scrollbar-thumb:hover {
   background: rgba(0, 150, 255, 0.5);
+}
+
+.toast {
+  position: fixed;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 200, 0, 0.95);
+  color: white;
+  padding: 14px 28px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: bold;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  z-index: 2000;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 </style>

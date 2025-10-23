@@ -41,6 +41,18 @@
               Time: {{ (gameState.currentRound.elapsedTime / 1000).toFixed(1) }}s
             </span>
           </div>
+        </div>
+
+        <!-- Betting Panel -->
+        <div class="betting-container">
+          <BettingPanel
+            :balance-cents="balanceState.balanceCents"
+            :state="gameState.currentRound.state"
+            :current-multiplier="gameState.currentRound.currentMultiplier"
+            :current-bet="balanceState.currentBet"
+            @place-bet="handlePlaceBet"
+            @cash-out="handleCashOut"
+          />
 
           <!-- Provably Fair Information -->
           <div class="fairness-info">
@@ -96,18 +108,6 @@
             </div>
           </div>
         </div>
-
-        <!-- Betting Panel -->
-        <div class="betting-container">
-          <BettingPanel
-            :balance-cents="balanceState.balanceCents"
-            :state="gameState.currentRound.state"
-            :current-multiplier="gameState.currentRound.currentMultiplier"
-            :current-bet="balanceState.currentBet"
-            @place-bet="handlePlaceBet"
-            @cash-out="handleCashOut"
-          />
-        </div>
       </div>
 
       <!-- RTP Settings -->
@@ -129,6 +129,11 @@
       :is-open="isVerifierOpen"
       @close="closeVerifier"
     />
+
+    <!-- Toast Notification -->
+    <div v-if="toastVisible" class="toast">
+      {{ toastMessage }}
+    </div>
   </div>
 </template>
 
@@ -156,6 +161,10 @@ const isSimulatorOpen = ref(false);
 
 // Fairness Verifier state
 const isVerifierOpen = ref(false);
+
+// Toast notification state
+const toastMessage = ref('');
+const toastVisible = ref(false);
 
 const stateClass = computed(() => {
   return {
@@ -213,12 +222,20 @@ function closeVerifier() {
   isVerifierOpen.value = false;
 }
 
+function showToast(message) {
+  toastMessage.value = message;
+  toastVisible.value = true;
+  setTimeout(() => {
+    toastVisible.value = false;
+  }, 2000);
+}
+
 function copyToClipboard(text, message = 'Copied!') {
   navigator.clipboard.writeText(text).then(() => {
-    alert(message);
+    showToast(message);
   }).catch(err => {
     console.error('Failed to copy:', err);
-    alert('Failed to copy to clipboard');
+    showToast('Failed to copy');
   });
 }
 
@@ -544,6 +561,33 @@ header h1 {
 .seed-info.revealed {
   border-left: 3px solid #00ff00;
   padding-left: 15px;
+}
+
+.toast {
+  position: fixed;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 150, 255, 0.95);
+  color: white;
+  padding: 14px 28px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: bold;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  z-index: 2000;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 @media (max-width: 768px) {

@@ -79,6 +79,11 @@
     <div v-if="rounds.length > maxDisplay" class="show-more">
       Showing {{ maxDisplay }} of {{ rounds.length }} rounds
     </div>
+
+    <!-- Toast Notification -->
+    <div v-if="toastVisible" class="toast">
+      {{ toastMessage }}
+    </div>
   </div>
 </template>
 
@@ -99,6 +104,8 @@ const props = defineProps({
 });
 
 const expandedRound = ref(null);
+const toastMessage = ref('');
+const toastVisible = ref(false);
 
 const displayRounds = computed(() => {
   return props.rounds.slice(0, props.maxDisplay);
@@ -112,12 +119,20 @@ function toggleExpand(roundId) {
   }
 }
 
+function showToast(message) {
+  toastMessage.value = message;
+  toastVisible.value = true;
+  setTimeout(() => {
+    toastVisible.value = false;
+  }, 2000);
+}
+
 function copyToClipboard(text) {
   navigator.clipboard.writeText(text).then(() => {
-    // Could add a toast notification here instead of alert
-    console.log('Copied to clipboard:', text.substring(0, 10) + '...');
+    showToast('Copied!');
   }).catch(err => {
     console.error('Failed to copy:', err);
+    showToast('Failed to copy');
   });
 }
 
@@ -382,5 +397,32 @@ h3 {
   color: #888;
   font-style: italic;
   margin: 8px 0 0 0;
+}
+
+.toast {
+  position: fixed;
+  top: 30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 200, 0, 0.95);
+  color: white;
+  padding: 14px 28px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: bold;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  z-index: 2000;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 </style>
