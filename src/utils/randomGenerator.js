@@ -25,16 +25,45 @@ export function generateSeed() {
 }
 
 /**
+ * Simple hash function fallback (for development in non-secure contexts)
+ * @param {string} str - String to hash
+ * @returns {string} Hash as hex string
+ */
+function simpleHash(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  // Convert to positive hex string and pad to 64 chars (like SHA-256)
+  const hexHash = Math.abs(hash).toString(16).padStart(8, '0');
+  return hexHash.repeat(8); // Repeat to match SHA-256 length
+}
+
+/**
  * Hash seed using SHA-256 (for provable fairness)
  * @param {string} seed - Seed to hash
  * @returns {Promise<string>} SHA-256 hash as hex string
  */
 export async function hashSeed(seed) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(seed);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  // Check if crypto.subtle is available (requires HTTPS or localhost)
+  if (window.crypto && window.crypto.subtle) {
+    try {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(seed);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    } catch (error) {
+      console.warn('crypto.subtle.digest failed, using fallback hash:', error);
+      return simpleHash(seed);
+    }
+  }
+
+  // Fallback for non-secure contexts (development only)
+  console.warn('crypto.subtle not available, using simple hash (development only)');
+  return simpleHash(seed);
 }
 
 /**
