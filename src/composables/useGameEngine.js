@@ -160,7 +160,7 @@ export function useGameEngine() {
     // CURVE_EXPONENT: 1.0 = linear, 2.0 = moderate, 3.0 = strong, higher = more dramatic
     // BASE_SPEED_RATIO: 0.0 = pure exponential, 0.3 = recommended, 1.0 = pure linear
     const CURVE_EXPONENT = 4;
-    const BASE_SPEED_RATIO = 0.1;  // 30% linear base speed + 70% exponential acceleration
+    const BASE_SPEED_RATIO = 0.3;  // 30% linear base speed + 70% exponential acceleration
     const multiplier = calculateCurrentMultiplier(elapsedMs, gameState.currentRound.crashPoint, CURVE_EXPONENT, BASE_SPEED_RATIO);
     gameState.currentRound.currentMultiplier = multiplier;
 
