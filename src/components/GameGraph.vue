@@ -36,6 +36,7 @@ let multiplierData = [];
 let startTime = null;
 let currentXRange = [0, 10];
 let currentYRange = [1.0, 2.0];
+let lineColor = '#00ff00';  // 線條顏色狀態
 
 onMounted(() => {
   if (!chartContainer.value) return;
@@ -49,7 +50,7 @@ onMounted(() => {
       },
       {
         label: 'Multiplier',
-        stroke: '#00ff00',
+        stroke: () => lineColor,  // 使用函數動態返回顏色
         width: 3,
         points: {
           show: false  // 不顯示數據點，只畫線
@@ -113,34 +114,67 @@ onMounted(() => {
 
 // Watch for state changes
 watch(() => props.state, (newState) => {
+  console.log('狀態變化:', newState);
+
   if (newState === 'RUNNING') {
+    console.log('開始新一輪遊戲');
     // Reset data when round starts
     startTime = Date.now();
-    timeData = [0];  // 從時間 0 開始
-    multiplierData = [1.0];  // 從倍率 1.0 開始
+    // 添加初始點 (0, 1.0)
+    timeData = [0];
+    multiplierData = [1.0];
     currentXRange = [0, 10];
     currentYRange = [1.0, 2.0];
+    lineColor = '#00ff00';  // 設置為綠色
 
     if (chart) {
       // 設置初始數據點 (0, 1.0)
       chart.setData([[0], [1.0]]);
+
+      // 重置坐標軸
+      chart.setScale('x', {
+        min: 0,
+        max: 10
+      });
+      chart.setScale('y', {
+        min: 1.0,
+        max: 2.0
+      });
+
+      console.log('圖表已重置,初始數據已設置');
     }
   } else if (newState === 'CRASHED') {
+    console.log('遊戲崩潰');
     // Turn line red when crashed
+    lineColor = '#ff0000';  // 設置為紅色
     if (chart) {
-      chart.series[1].stroke = '#ff0000';
+      // 強制重繪以更新顏色
+      chart.setData([timeData, multiplierData]);
     }
   } else if (newState === 'BETTING') {
+    console.log('進入下注階段');
     // Reset to green for next round
     if (chart) {
-      chart.series[1].stroke = '#00ff00';
-
-      // 重置坐標軸範圍
+      // 重置數據和坐標軸範圍
+      timeData = [];
+      multiplierData = [];
       currentXRange = [0, 10];
       currentYRange = [1.0, 2.0];
 
       // 清空數據
       chart.setData([[], []]);
+
+      // 重置 X 和 Y 軸範圍
+      chart.setScale('x', {
+        min: 0,
+        max: 10
+      });
+      chart.setScale('y', {
+        min: 1.0,
+        max: 2.0
+      });
+
+      console.log('圖表已清空');
     }
   }
 });
@@ -150,16 +184,18 @@ watch(() => props.currentMultiplier, (newMultiplier) => {
   if (props.state === 'RUNNING' && chart && startTime) {
     const elapsedSeconds = (Date.now() - startTime) / 1000;
 
-    // 添加新數據點
-    timeData.push(elapsedSeconds);
-    multiplierData.push(newMultiplier);
+    // 只在時間 > 0 時添加新數據點（第一個點 (0, 1.0) 已經在 RUNNING 狀態時添加）
+    if (elapsedSeconds > 0) {
+      console.log('添加數據點:', elapsedSeconds.toFixed(2), 's', newMultiplier.toFixed(2) + 'x', '數據長度:', timeData.length);
+      timeData.push(elapsedSeconds);
+      multiplierData.push(newMultiplier);
 
-    // 更新圖表數據
-    chart.setData([timeData, multiplierData]);
+      // 更新圖表數據
+      chart.setData([timeData, multiplierData]);
 
-    // 動態調整 X 軸範圍（必須在 setData 之後）
-    const currentMaxX = currentXRange[1];
-    if (elapsedSeconds > currentMaxX * 0.8) {
+      // 動態調整 X 軸範圍（必須在 setData 之後）
+      const currentMaxX = currentXRange[1];
+      if (elapsedSeconds > currentMaxX * 0.8) {
       const targetMax = elapsedSeconds * 1.2;
       const newMaxX = Math.max(currentMaxX, targetMax);
       currentXRange = [0, newMaxX];
@@ -184,6 +220,7 @@ watch(() => props.currentMultiplier, (newMultiplier) => {
         min: 1.0,
         max: newMaxY
       });
+      }
     }
   }
 });
