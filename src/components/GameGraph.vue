@@ -1,6 +1,6 @@
 <template>
   <div class="game-graph">
-    <canvas ref="chartCanvas"></canvas>
+    <div ref="chartContainer" class="chart-container"></div>
     <div v-if="state === 'CRASHED'" class="crash-marker">
       CRASHED AT {{ crashPoint.toFixed(2) }}x
     </div>
@@ -9,10 +9,8 @@
 
 <script setup>
 import { ref, watch, onMounted, onBeforeUnmount } from 'vue';
-import { Chart, LineController, LineElement, PointElement, LinearScale, Title, CategoryScale } from 'chart.js';
-
-// Register Chart.js components
-Chart.register(LineController, LineElement, PointElement, LinearScale, Title, CategoryScale);
+import uPlot from 'uplot';
+import 'uplot/dist/uPlot.min.css';
 
 const props = defineProps({
   currentMultiplier: {
@@ -31,124 +29,118 @@ const props = defineProps({
   }
 });
 
-const chartCanvas = ref(null);
+const chartContainer = ref(null);
 let chart = null;
-const dataPoints = [];
-const timePoints = [];
+let timeData = [];
+let multiplierData = [];
 let startTime = null;
+let currentXRange = [0, 10];
+let currentYRange = [1.0, 2.0];
 
 onMounted(() => {
-  if (!chartCanvas.value) return;
+  if (!chartContainer.value) return;
 
-  chart = new Chart(chartCanvas.value, {
-    type: 'line',
-    data: {
-      labels: timePoints,
-      datasets: [{
-        label: 'Multiplier',
-        data: dataPoints,
-        borderColor: '#00ff00',
-        backgroundColor: 'rgba(0, 255, 0, 0.1)',
-        borderWidth: 3,
-        tension: 0.1,
-        pointRadius: 0,
-        pointHoverRadius: 0
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: false,
-      scales: {
-        x: {
-          type: 'linear',
-          min: 0,
-          max: 10,
-          title: {
-            display: true,
-            text: 'Time (s)',
-            color: '#fff'
-          },
-          ticks: {
-            color: '#fff',
-            stepSize: 10,
-            callback: function(value) {
-              return value.toFixed(0);
-            }
-          },
-          grid: {
-            color: 'rgba(255, 255, 255, 0.1)'
-          }
-        },
-        y: {
-          type: 'linear',
-          beginAtZero: false,
-          min: 1.0,
-          max: 2.0,
-          title: {
-            display: true,
-            text: 'Multiplier',
-            color: '#fff'
-          },
-          ticks: {
-            color: '#fff',
-            stepSize: 0.2,
-            callback: function(value) {
-              return value.toFixed(1) + 'x';
-            }
-          },
-          grid: {
-            color: 'rgba(255, 255, 255, 0.1)'
-          }
-        }
+  const opts = {
+    width: chartContainer.value.offsetWidth,
+    height: 400,
+    series: [
+      {
+        label: 'Time (s)'
       },
-      plugins: {
-        legend: {
-          display: false
-        },
-        tooltip: {
-          enabled: false
+      {
+        label: 'Multiplier',
+        stroke: '#00ff00',
+        width: 3,
+        points: {
+          show: false  // 不顯示數據點，只畫線
         }
       }
+    ],
+    axes: [
+      {
+        stroke: '#fff',
+        grid: {
+          show: false,  // 禁用 X 軸網格線
+        },
+        ticks: {
+          stroke: 'rgba(255, 255, 255, 0.3)',
+        },
+      },
+      {
+        stroke: '#fff',
+        grid: {
+          stroke: 'rgba(255, 255, 255, 0.1)',
+          width: 1,
+        },
+        ticks: {
+          stroke: 'rgba(255, 255, 255, 0.3)',
+        },
+      }
+    ],
+    scales: {
+      x: {
+        time: false,
+        auto: false,
+        range: (u, dataMin, dataMax) => currentXRange,
+      },
+      y: {
+        auto: false,
+        range: [1.0, 2.0],
+      }
+    },
+    padding: [10, 10, 0, 0],
+  };
+
+  // 初始化空數據
+  const data = [
+    [],  // x 軸（時間）
+    [],  // y 軸（倍率）
+  ];
+
+  chart = new uPlot(opts, data, chartContainer.value);
+
+  // 監聽視窗大小變化
+  const resizeObserver = new ResizeObserver(() => {
+    if (chart && chartContainer.value) {
+      chart.setSize({
+        width: chartContainer.value.offsetWidth,
+        height: 400
+      });
     }
   });
+  resizeObserver.observe(chartContainer.value);
 });
 
 // Watch for state changes
 watch(() => props.state, (newState) => {
   if (newState === 'RUNNING') {
     // Reset data when round starts
-    dataPoints.length = 0;
-    timePoints.length = 0;
     startTime = Date.now();
+    timeData = [];
+    multiplierData = [];
+    currentXRange = [0, 10];
+    currentYRange = [1.0, 2.0];
 
-    // Reset axes to minimum range
     if (chart) {
-      chart.options.scales.x.min = 0;
-      chart.options.scales.x.max = 10;
-      chart.options.scales.y.min = 1.0;
-      chart.options.scales.y.max = 2.0;
+      // 清空數據
+      chart.setData([[], []]);
     }
   } else if (newState === 'CRASHED') {
     // Turn line red when crashed
     if (chart) {
-      chart.data.datasets[0].borderColor = '#ff0000';
-      chart.update('none');
+      chart.series[1].stroke = '#ff0000';
     }
   } else if (newState === 'BETTING') {
     // Reset to green for next round
     if (chart) {
-      chart.data.datasets[0].borderColor = '#00ff00';
-      dataPoints.length = 0;
-      timePoints.length = 0;
+      chart.series[1].stroke = '#00ff00';
 
-      // Reset axes to minimum range
-      chart.options.scales.x.min = 0;
-      chart.options.scales.x.max = 10;
-      chart.options.scales.y.min = 1.0;
-      chart.options.scales.y.max = 2.0;
+      // 重置坐標軸範圍
+      currentXRange = [0, 10];
+      currentYRange = [1.0, 2.0];
 
-      chart.update('none');
+      // 清空數據
+      chart.setData([[], []]);
     }
   }
 });
@@ -158,34 +150,41 @@ watch(() => props.currentMultiplier, (newMultiplier) => {
   if (props.state === 'RUNNING' && chart && startTime) {
     const elapsedSeconds = (Date.now() - startTime) / 1000;
 
-    // Add new data point
-    timePoints.push(elapsedSeconds);
-    dataPoints.push(newMultiplier);
+    // 添加新數據點
+    timeData.push(elapsedSeconds);
+    multiplierData.push(newMultiplier);
 
-    // Dynamically adjust X-axis range
-    // Always start from 0, minimum 10 seconds, continuously update as time grows
-    const currentMaxX = chart.options.scales.x.max;
+    // 更新圖表數據
+    chart.setData([timeData, multiplierData]);
+
+    // 動態調整 X 軸範圍（必須在 setData 之後）
+    const currentMaxX = currentXRange[1];
     if (elapsedSeconds > currentMaxX * 0.8) {
-      // Continuously expand X-axis to keep current time at ~80% of range
-      // Add some padding (20%) ahead of current time
-      chart.options.scales.x.max = Math.max(currentMaxX, elapsedSeconds * 1.2);
+      const targetMax = elapsedSeconds * 1.2;
+      const newMaxX = Math.max(currentMaxX, targetMax);
+      currentXRange = [0, newMaxX];
+
+      // 使用 setScale 來更新 X 軸範圍
+      chart.setScale('x', {
+        min: 0,
+        max: newMaxX
+      });
     }
 
-    // Dynamically adjust Y-axis range
-    // Start at 1.0-2.0, continuously update max as multiplier grows
-    const currentMaxY = chart.options.scales.y.max;
+    // 動態調整 Y 軸範圍（必須在 setData 之後）
+    const currentMaxY = currentYRange[1];
     if (newMultiplier > currentMaxY * 0.8) {
-      // Continuously expand Y-axis to keep current multiplier at ~80% of range
-      // Add some padding (20%) above current multiplier
-      chart.options.scales.y.max = Math.max(currentMaxY, newMultiplier * 1.2);
+      const targetMax = newMultiplier * 1.2;
+      const newMaxY = Math.max(currentMaxY, targetMax);
+      currentYRange = [1.0, newMaxY];
+      console.log('Y軸範圍更新:', currentYRange, '當前倍率:', newMultiplier);
+
+      // 使用 setScale 來更新 Y 軸範圍
+      chart.setScale('y', {
+        min: 1.0,
+        max: newMaxY
+      });
     }
-
-    // Keep all data points to show complete history from time 0
-    // Note: For very long games, consider increasing the limit or implementing
-    // a more sophisticated data management strategy
-
-    // Update chart
-    chart.update('none'); // 'none' mode = no animation for better performance
   }
 });
 
@@ -200,15 +199,28 @@ onBeforeUnmount(() => {
 .game-graph {
   position: relative;
   width: 100%;
-  height: 400px;
+  height: 440px;
   background: #2a2a2a;
   border-radius: 8px;
   padding: 20px;
 }
 
-canvas {
-  width: 100% !important;
-  height: 100% !important;
+.chart-container {
+  width: 100%;
+  height: 400px;
+}
+
+/* uPlot 深色主題樣式覆蓋 */
+.game-graph :deep(.u-wrap) {
+  background: transparent;
+}
+
+.game-graph :deep(.u-legend) {
+  display: none;
+}
+
+.game-graph :deep(.u-axis) {
+  color: #fff;
 }
 
 .crash-marker {
