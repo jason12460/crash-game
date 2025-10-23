@@ -57,28 +57,41 @@
       </div>
 
       <!-- RTP Settings -->
-      <RTPSettings />
+      <RTPSettings @open-simulator="openSimulator" />
 
       <!-- Game History -->
       <GameHistory :rounds="historyState.rounds" :max-display="20" />
     </main>
+
+    <!-- RTP Simulator Modal -->
+    <RTPSimulator
+      :is-open="isSimulatorOpen"
+      :rtp-factor="rtpConfig.rtpFactor"
+      @close="closeSimulator"
+    />
   </div>
 </template>
 
 <script setup>
-import { onMounted, computed, watch } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import GameGraph from './components/GameGraph.vue';
 import BalanceDisplay from './components/BalanceDisplay.vue';
 import BettingPanel from './components/BettingPanel.vue';
 import GameHistory from './components/GameHistory.vue';
 import RTPSettings from './components/RTPSettings.vue';
+import RTPSimulator from './components/RTPSimulator.vue';
 import { useGameEngine } from './composables/useGameEngine.js';
 import { useBalance } from './composables/useBalance.js';
 import { useGameHistory } from './composables/useGameHistory.js';
+import { useRTPConfig } from './composables/useRTPConfig.js';
 
 const { gameState, init, cleanup, on } = useGameEngine();
 const { balanceState, placeBet, cashOut, loseBet, clearCurrentBet, resetBalance } = useBalance();
 const { historyState, addRound, clearHistory } = useGameHistory();
+const { rtpConfig } = useRTPConfig();
+
+// RTP Simulator state
+const isSimulatorOpen = ref(false);
 
 const stateClass = computed(() => {
   return {
@@ -118,6 +131,14 @@ function handleReset() {
     // Reload the page to ensure a clean state
     window.location.reload();
   }
+}
+
+function openSimulator() {
+  isSimulatorOpen.value = true;
+}
+
+function closeSimulator() {
+  isSimulatorOpen.value = false;
 }
 
 // Watch for state changes to clear bet at the right time

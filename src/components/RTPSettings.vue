@@ -1,8 +1,13 @@
 <template>
   <div class="rtp-settings">
     <div class="settings-header">
-      <h3>RTP Settings</h3>
-      <span class="settings-subtitle">Return to Player Configuration</span>
+      <div>
+        <h3>RTP Settings</h3>
+        <span class="settings-subtitle">Return to Player Configuration</span>
+      </div>
+      <button class="btn-simulator" @click="$emit('open-simulator')">
+        RTP Simulator
+      </button>
     </div>
 
     <div class="rtp-control">
@@ -64,6 +69,8 @@
 import { ref, computed, watch } from 'vue';
 import { useRTPConfig } from '../composables/useRTPConfig.js';
 
+defineEmits(['open-simulator']);
+
 const { rtpConfig, setRTPPercentage } = useRTPConfig();
 
 // Local RTP value for slider (prevents too many updates)
@@ -113,6 +120,10 @@ function isPresetActive(value) {
   margin-bottom: 20px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
   padding-bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
 }
 
 .settings-header h3 {
@@ -124,6 +135,30 @@ function isPresetActive(value) {
 .settings-subtitle {
   font-size: 0.9em;
   opacity: 0.8;
+}
+
+.btn-simulator {
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-radius: 8px;
+  color: white;
+  font-size: 0.9em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  white-space: nowrap;
+}
+
+.btn-simulator:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.6);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.btn-simulator:active {
+  transform: translateY(0);
 }
 
 .rtp-control {
@@ -272,6 +307,15 @@ function isPresetActive(value) {
 @media (max-width: 768px) {
   .rtp-settings {
     padding: 15px;
+  }
+
+  .settings-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .btn-simulator {
+    width: 100%;
   }
 
   .percentage {
