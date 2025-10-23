@@ -3,7 +3,10 @@
     <header>
       <h1>Crash Game</h1>
       <p class="tagline">Watch the multiplier rise... cash out before it crashes!</p>
-      <button class="reset-button" @click="handleReset">Reset Game</button>
+      <div class="header-buttons">
+        <button class="rtp-settings-button" @click="openRTPSettings">RTP Settings</button>
+        <button class="reset-button" @click="handleReset">Reset Game</button>
+      </div>
     </header>
 
     <main>
@@ -110,12 +113,16 @@
         </div>
       </div>
 
-      <!-- RTP Settings -->
-      <RTPSettings @open-simulator="openSimulator" />
-
       <!-- Game History -->
       <GameHistory :rounds="historyState.rounds" :max-display="20" />
     </main>
+
+    <!-- RTP Settings Modal -->
+    <div v-if="isRTPSettingsOpen" class="modal-overlay" @click="closeRTPSettings">
+      <div class="modal-content rtp-settings-modal" @click.stop>
+        <RTPSettings @open-simulator="openSimulator" />
+      </div>
+    </div>
 
     <!-- RTP Simulator Modal -->
     <RTPSimulator
@@ -155,6 +162,9 @@ const { gameState, init, cleanup, on } = useGameEngine();
 const { balanceState, placeBet, cashOut, loseBet, clearCurrentBet, resetBalance } = useBalance();
 const { historyState, addRound, clearHistory } = useGameHistory();
 const { rtpConfig } = useRTPConfig();
+
+// RTP Settings state
+const isRTPSettingsOpen = ref(false);
 
 // RTP Simulator state
 const isSimulatorOpen = ref(false);
@@ -204,6 +214,14 @@ function handleReset() {
     // Reload the page to ensure a clean state
     window.location.reload();
   }
+}
+
+function openRTPSettings() {
+  isRTPSettingsOpen.value = true;
+}
+
+function closeRTPSettings() {
+  isRTPSettingsOpen.value = false;
 }
 
 function openSimulator() {
@@ -324,10 +342,38 @@ header h1 {
   margin-bottom: 15px;
 }
 
-.reset-button {
+.header-buttons {
   position: absolute;
   top: 0;
   right: 0;
+  display: flex;
+  gap: 10px;
+}
+
+.rtp-settings-button {
+  background: rgba(128, 0, 255, 0.2);
+  color: #bb88ff;
+  border: 2px solid #bb88ff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.rtp-settings-button:hover {
+  background: rgba(128, 0, 255, 0.3);
+  border-color: #dd99ff;
+  color: #dd99ff;
+  transform: scale(1.05);
+}
+
+.rtp-settings-button:active {
+  transform: scale(0.95);
+}
+
+.reset-button {
   background: rgba(255, 0, 0, 0.2);
   color: #ff6666;
   border: 2px solid #ff6666;
@@ -561,6 +607,35 @@ header h1 {
 .seed-info.revealed {
   border-left: 3px solid #00ff00;
   padding-left: 15px;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-content {
+  position: relative;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: rgba(26, 26, 46, 0.98);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.rtp-settings-modal {
+  width: 100%;
+  padding: 0;
 }
 
 .toast {
