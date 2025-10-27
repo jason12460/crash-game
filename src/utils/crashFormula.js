@@ -39,8 +39,8 @@ export function calculateCurrentMultiplier(elapsedMs, crashPoint) {
   let currentMultiplier = baseMultiplier;
   
   const growthRate = 0.0000693;        // 前10秒：1x -> 2x
-  const secondPhaseGrowthRate = 0.000110;  // 10-25秒：2x -> 10x (調整)
-  const thirdPhaseGrowthRate = 0.000230;   // 25秒後：10x -> 100x (調整)
+  const secondPhaseGrowthRate = 0.0000921;  // 10-25秒：2x -> 8x (調整) // 0.0000921 8x  // 0.000110 10x
+  const thirdPhaseGrowthRate = 0.0001842;   // 25-35秒：10x -> 50x (調整) // 0.0001842 50x // 0.000230 100x
   
   // 分段增長模型 - 使用累積方式避免斷層
   if (elapsedMs < 10000) {
