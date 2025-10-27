@@ -148,6 +148,16 @@ export function useGameEngine() {
       seedHash: gameState.currentRound.seedHash
     });
 
+    const multiplier10s = calculateCurrentMultiplier(10*1000, gameState.currentRound.crashPoint);
+    const multiplier25s = calculateCurrentMultiplier(25*1000, gameState.currentRound.crashPoint);
+    const multiplier35s = calculateCurrentMultiplier(35*1000, gameState.currentRound.crashPoint);
+    const multiplier40s = calculateCurrentMultiplier(40*1000, gameState.currentRound.crashPoint);
+
+    console.log('multiplier10s', multiplier10s);
+    console.log('multiplier25s', multiplier25s);
+    console.log('multiplier35s', multiplier35s);
+    console.log('multiplier40s', multiplier40s);
+
     gameLoop();
   }
 
@@ -156,12 +166,7 @@ export function useGameEngine() {
     const elapsedMs = now - gameState.currentRound.startTime;
     gameState.currentRound.elapsedTime = elapsedMs;
 
-    // Adjust acceleration curve:
-    // CURVE_EXPONENT: 1.0 = linear, 2.0 = moderate, 3.0 = strong, higher = more dramatic
-    // BASE_SPEED_RATIO: 0.0 = pure exponential, 0.3 = recommended, 1.0 = pure linear
-    const CURVE_EXPONENT = 4;
-    const BASE_SPEED_RATIO = 0.3;  // 30% linear base speed + 70% exponential acceleration
-    const multiplier = calculateCurrentMultiplier(elapsedMs, gameState.currentRound.crashPoint, CURVE_EXPONENT, BASE_SPEED_RATIO);
+    const multiplier = calculateCurrentMultiplier(elapsedMs, gameState.currentRound.crashPoint);
     gameState.currentRound.currentMultiplier = multiplier;
 
     emit('multiplierUpdate', {
