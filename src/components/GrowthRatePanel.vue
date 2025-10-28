@@ -5,54 +5,85 @@
     </div>
 
     <div class="panel-content">
+      <!-- Phase 1 -->
       <div class="rate-input-group">
-        <label for="phase1-input">
-          Phase 1 (0-10s: 1x → 2x):
-        </label>
-        <div class="input-wrapper">
-          <input
-            id="phase1-input"
-            v-model.number="phase1Input"
-            type="number"
-            step="0.0000001"
-            min="0.000001"
-            max="0.001"
-            @input="updateRate(1, phase1Input)"
-          />
+        <label class="phase-label">Phase 1:</label>
+        <div class="phase-inputs">
+          <div class="time-input">
+            <label for="phase1-end" class="input-label">End Time (s):</label>
+            <input
+              id="phase1-end"
+              v-model.number="phase1EndInput"
+              type="number"
+              step="1"
+              min="1"
+              @input="updateEndTime(1, phase1EndInput * 1000)"
+            />
+          </div>
+          <div class="rate-input">
+            <label for="phase1-rate" class="input-label">Growth Rate:</label>
+            <input
+              id="phase1-rate"
+              v-model.number="phase1Input"
+              type="number"
+              step="0.0000001"
+              min="0.000001"
+              max="0.001"
+              @input="updateRate(1, phase1Input)"
+            />
+          </div>
         </div>
       </div>
 
+      <!-- Phase 2 -->
       <div class="rate-input-group">
-        <label for="phase2-input">
-          Phase 2 (10-25s: 2x → 8x):
-        </label>
-        <div class="input-wrapper">
-          <input
-            id="phase2-input"
-            v-model.number="phase2Input"
-            type="number"
-            step="0.0000001"
-            min="0.000001"
-            max="0.001"
-            @input="updateRate(2, phase2Input)"
-          />
+        <label class="phase-label">Phase 2:</label>
+        <div class="phase-inputs">
+          <div class="time-input">
+            <label for="phase2-end" class="input-label">End Time (s):</label>
+            <input
+              id="phase2-end"
+              v-model.number="phase2EndInput"
+              type="number"
+              step="1"
+              min="1"
+              @input="updateEndTime(2, phase2EndInput * 1000)"
+            />
+          </div>
+          <div class="rate-input">
+            <label for="phase2-rate" class="input-label">Growth Rate:</label>
+            <input
+              id="phase2-rate"
+              v-model.number="phase2Input"
+              type="number"
+              step="0.0000001"
+              min="0.000001"
+              max="0.001"
+              @input="updateRate(2, phase2Input)"
+            />
+          </div>
         </div>
       </div>
 
+      <!-- Phase 3 -->
       <div class="rate-input-group">
-        <label for="phase3-input">
-          Phase 3 (25-35s: 8x → 50x):
-        </label>
-        <div class="input-wrapper">
-          <input
-            id="phase3-input"
-            v-model.number="phase3Input"
-            type="number"
-            step="0.0000001"
-            min="0.000001"
-            max="0.001"
-            @input="updateRate(3, phase3Input)"
-          />
+        <label class="phase-label">Phase 3:</label>
+        <div class="phase-inputs">
+          <div class="time-input">
+            <span class="input-label">Start Time (s): {{ (timeEndPoints.phase2 / 1000).toFixed(0) }}+</span>
+          </div>
+          <div class="rate-input">
+            <label for="phase3-rate" class="input-label">Growth Rate:</label>
+            <input
+              id="phase3-rate"
+              v-model.number="phase3Input"
+              type="number"
+              step="0.0000001"
+              min="0.000001"
+              max="0.001"
+              @input="updateRate(3, phase3Input)"
+            />
+          </div>
         </div>
       </div>
 
@@ -92,15 +123,19 @@ import { useGrowthRateConfig } from '@/composables/useGrowthRateConfig';
 import { calculateCurrentMultiplier, calculateAverageGameTime } from '@/utils/crashFormula';
 import { useRTPConfig } from '@/composables/useRTPConfig';
 
-const { rates, setGrowthRate, resetToDefaults } = useGrowthRateConfig();
+const { rates, timeEndPoints, setGrowthRate, setPhaseEndTime, resetToDefaults } = useGrowthRateConfig();
 const { rtpConfig } = useRTPConfig();
 
-// Local input values
+// Local input values for growth rates
 const phase1Input = ref(rates.phase1);
 const phase2Input = ref(rates.phase2);
 const phase3Input = ref(rates.phase3);
 
-// Watch for external changes to rates (e.g., from localStorage on page load)
+// Local input values for time boundaries (in seconds)
+const phase1EndInput = ref(timeEndPoints.phase1 / 1000);
+const phase2EndInput = ref(timeEndPoints.phase2 / 1000);
+
+// Watch for external changes to rates
 watch(
   () => rates,
   (newRates) => {
@@ -111,9 +146,24 @@ watch(
   { deep: true, immediate: true }
 );
 
+// Watch for external changes to time endpoints
+watch(
+  () => timeEndPoints,
+  (newEndPoints) => {
+    phase1EndInput.value = newEndPoints.phase1 / 1000;
+    phase2EndInput.value = newEndPoints.phase2 / 1000;
+  },
+  { deep: true, immediate: true }
+);
+
 // Update rate with validation
 const updateRate = (phase, value) => {
   setGrowthRate(phase, value);
+};
+
+// Update end time with validation
+const updateEndTime = (phase, timeMs) => {
+  setPhaseEndTime(phase, timeMs);
 };
 
 // Reset to default values
@@ -122,6 +172,8 @@ const handleReset = () => {
   phase1Input.value = rates.phase1;
   phase2Input.value = rates.phase2;
   phase3Input.value = rates.phase3;
+  phase1EndInput.value = timeEndPoints.phase1 / 1000;
+  phase2EndInput.value = timeEndPoints.phase2 / 1000;
 };
 
 // Real-time preview calculations for every 5 seconds up to 60 seconds
@@ -189,24 +241,42 @@ const averageGameTime = computed(() => {
 .rate-input-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  padding: 12px;
+  background-color: #2a2a2a;
+  border-radius: 4px;
 }
 
-.rate-input-group label {
-  color: #cccccc;
+.phase-label {
+  color: #ffffff;
   font-size: 14px;
+  font-weight: 600;
+}
+
+.phase-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.time-input,
+.rate-input {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.input-label {
+  color: #cccccc;
+  font-size: 12px;
   font-weight: 500;
 }
 
-.input-wrapper {
-  display: flex;
-  align-items: center;
-}
-
-.input-wrapper input {
+.time-input input,
+.rate-input input {
   width: 100%;
   padding: 8px 12px;
-  background-color: #2a2a2a;
+  background-color: #1a1a1a;
   border: 1px solid #444;
   border-radius: 4px;
   color: #ffffff;
@@ -214,7 +284,8 @@ const averageGameTime = computed(() => {
   font-family: 'Courier New', monospace;
 }
 
-.input-wrapper input:focus {
+.time-input input:focus,
+.rate-input input:focus {
   outline: none;
   border-color: #4a90e2;
   box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);

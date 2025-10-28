@@ -38,7 +38,8 @@ function generateCurveData(growthRates, maxTime = 60) {
 
     // 記錄到達100x的時間
     if (!reached100x && mult >= 100) {
-      timeToHundredX.value = timeToReachMultiplier(100, growthRates) / 1000;
+      const { timeEndPoints } = useGrowthRateConfig();
+      timeToHundredX.value = timeToReachMultiplier(100, growthRates, timeEndPoints) / 1000;
       reached100x = true;
     }
 
@@ -65,9 +66,14 @@ function createPhaseBackgrounds() {
           const { ctx } = u;
           const { width, height, top, left } = u.bbox;
 
+          // 獲取動態時間邊界
+          const { timeEndPoints } = useGrowthRateConfig();
+          const phase1EndSeconds = timeEndPoints.phase1 / 1000;
+          const phase2EndSeconds = timeEndPoints.phase2 / 1000;
+
           // 計算階段邊界在畫布上的像素位置
-          const phase1End = u.valToPos(10, 'x', true);
-          const phase2End = u.valToPos(25, 'x', true);
+          const phase1End = u.valToPos(phase1EndSeconds, 'x', true);
+          const phase2End = u.valToPos(phase2EndSeconds, 'x', true);
 
           ctx.save();
 
@@ -212,6 +218,16 @@ onMounted(() => {
 // 監聽成長率變化
 watch(
   () => rates,
+  () => {
+    updateChart();
+  },
+  { deep: true }
+);
+
+// 監聽時間邊界變化
+const { timeEndPoints } = useGrowthRateConfig();
+watch(
+  () => timeEndPoints,
   () => {
     updateChart();
   },

@@ -40,34 +40,37 @@ export function calculateCurrentMultiplier(elapsedMs) {
   const baseMultiplier = 1.0;
   let currentMultiplier = baseMultiplier;
 
-  // Get growth rates from config (allows real-time adjustment)
-  const { rates } = useGrowthRateConfig();
-  const growthRate = rates.phase1;              // 前10秒：1x -> 2x
-  const secondPhaseGrowthRate = rates.phase2;   // 10-25秒：2x -> 8x
-  const thirdPhaseGrowthRate = rates.phase3;    // 25-35秒：10x -> 50x
-  
+  // Get growth rates and time boundaries from config (allows real-time adjustment)
+  const { rates, timeEndPoints } = useGrowthRateConfig();
+  const growthRate = rates.phase1;
+  const secondPhaseGrowthRate = rates.phase2;
+  const thirdPhaseGrowthRate = rates.phase3;
+  const phase1End = timeEndPoints.phase1;
+  const phase2End = timeEndPoints.phase2;
+
   // 分段增長模型 - 使用累積方式避免斷層
-  if (elapsedMs < 10000) {
-    // 前10秒：慢增長階段 (1x -> 2x)
+  if (elapsedMs < phase1End) {
+    // Phase 1: 慢增長階段
     currentMultiplier = baseMultiplier * Math.pow(Math.E, growthRate * elapsedMs);
-  } else if (elapsedMs < 25000) {
-    // 10-25秒：中等增長階段 (2x -> 10x)
-    // 先計算前10秒的倍數
-    const firstPhaseMultiplier = baseMultiplier * Math.pow(Math.E, growthRate * 10000);
+  } else if (elapsedMs < phase2End) {
+    // Phase 2: 中等增長階段
+    // 先計算 Phase 1 的倍數
+    const firstPhaseMultiplier = baseMultiplier * Math.pow(Math.E, growthRate * phase1End);
     // 再計算剩餘時間的增長
-    const remainingTime = elapsedMs - 10000;
-    
+    const remainingTime = elapsedMs - phase1End;
+
     currentMultiplier = firstPhaseMultiplier * Math.pow(Math.E, secondPhaseGrowthRate * remainingTime);
   } else {
-    // 25秒後：快速增長階段 (10x -> 100x)
-    // 先計算前25秒的倍數
-    const firstPhaseMultiplier = baseMultiplier * Math.pow(Math.E, growthRate * 10000);
-    const secondPhaseMultiplier = firstPhaseMultiplier * Math.pow(Math.E, secondPhaseGrowthRate * 15000);
+    // Phase 3: 快速增長階段
+    // 先計算前兩階段的倍數
+    const firstPhaseMultiplier = baseMultiplier * Math.pow(Math.E, growthRate * phase1End);
+    const phase2Duration = phase2End - phase1End;
+    const secondPhaseMultiplier = firstPhaseMultiplier * Math.pow(Math.E, secondPhaseGrowthRate * phase2Duration);
     // 再計算剩餘時間的增長
-    const remainingTime = elapsedMs - 25000;
+    const remainingTime = elapsedMs - phase2End;
     currentMultiplier = secondPhaseMultiplier * Math.pow(Math.E, thirdPhaseGrowthRate * remainingTime);
   }
-  
+
   // 確保不超過爆炸點
   return currentMultiplier;
 }
@@ -77,41 +80,44 @@ export function calculateCurrentMultiplier(elapsedMs) {
  * Uses the three-phase exponential growth model
  * @param {number} targetMultiplier - Target multiplier to reach
  * @param {object} rates - Growth rates object {phase1, phase2, phase3}
+ * @param {object} timeEndPoints - Time boundaries {phase1, phase2} in milliseconds
  * @returns {number} Time in milliseconds needed to reach target multiplier
  */
-export function timeToReachMultiplier(targetMultiplier, rates) {
+export function timeToReachMultiplier(targetMultiplier, rates, timeEndPoints = null) {
   if (targetMultiplier <= 1.0) return 0;
+
+  // Use provided timeEndPoints or get from config
+  const endpoints = timeEndPoints || useGrowthRateConfig().timeEndPoints;
+  const phase1End = endpoints.phase1;
+  const phase2End = endpoints.phase2;
 
   const baseMultiplier = 1.0;
 
-  // Calculate phase endpoints
-  const mult10s = baseMultiplier * Math.pow(Math.E, rates.phase1 * 10000);
-  const mult25s = mult10s * Math.pow(Math.E, rates.phase2 * 15000);
+  // Calculate phase endpoint multipliers
+  const multPhase1End = baseMultiplier * Math.pow(Math.E, rates.phase1 * phase1End);
+  const phase2Duration = phase2End - phase1End;
+  const multPhase2End = multPhase1End * Math.pow(Math.E, rates.phase2 * phase2Duration);
 
-  // Phase 1: 0-10s
-  if (targetMultiplier <= mult10s) {
+  // Phase 1
+  if (targetMultiplier <= multPhase1End) {
     // Solve: targetMultiplier = e^(r1 * t)
-    // ln(targetMultiplier) = r1 * t
     // t = ln(targetMultiplier) / r1
     return Math.log(targetMultiplier) / rates.phase1;
   }
 
-  // Phase 2: 10-25s
-  if (targetMultiplier <= mult25s) {
-    // Solve: targetMultiplier = mult10s * e^(r2 * (t - 10000))
-    // targetMultiplier / mult10s = e^(r2 * (t - 10000))
-    // ln(targetMultiplier / mult10s) = r2 * (t - 10000)
-    // t = 10000 + ln(targetMultiplier / mult10s) / r2
-    const exponent = Math.log(targetMultiplier / mult10s) / rates.phase2;
-    return 10000 + exponent;
+  // Phase 2
+  if (targetMultiplier <= multPhase2End) {
+    // Solve: targetMultiplier = multPhase1End * e^(r2 * (t - phase1End))
+    // t = phase1End + ln(targetMultiplier / multPhase1End) / r2
+    const exponent = Math.log(targetMultiplier / multPhase1End) / rates.phase2;
+    return phase1End + exponent;
   }
 
-  // Phase 3: 25s+
-  // Solve: targetMultiplier = mult25s * e^(r3 * (t - 25000))
-  // ln(targetMultiplier / mult25s) = r3 * (t - 25000)
-  // t = 25000 + ln(targetMultiplier / mult25s) / r3
-  const exponent = Math.log(targetMultiplier / mult25s) / rates.phase3;
-  return 25000 + exponent;
+  // Phase 3
+  // Solve: targetMultiplier = multPhase2End * e^(r3 * (t - phase2End))
+  // t = phase2End + ln(targetMultiplier / multPhase2End) / r3
+  const exponent = Math.log(targetMultiplier / multPhase2End) / rates.phase3;
+  return phase2End + exponent;
 }
 
 /**
@@ -131,8 +137,12 @@ export function timeToReachMultiplier(targetMultiplier, rates) {
 export function calculateAverageGameTime(
   maxMultiplier = 100,
   rtpFactor = 0.97,
-  rates
+  rates,
+  timeEndPoints = null
 ) {
+  // Get time endpoints
+  const endpoints = timeEndPoints || useGrowthRateConfig().timeEndPoints;
+
   // Numerical integration using adaptive sampling
   // Split into regions based on probability density
 
@@ -141,10 +151,6 @@ export function calculateAverageGameTime(
   // Integration parameters
   const minMultiplier = rtpFactor; // Minimum possible crash point
   const integrationSteps = 10000; // Fine-grained integration
-
-  // Calculate multiplier endpoints for each phase
-  const mult10s = Math.pow(Math.E, rates.phase1 * 10000);
-  const mult25s = mult10s * Math.pow(Math.E, rates.phase2 * 15000);
 
   // Determine effective max (capped at maxMultiplier)
   const effectiveMax = Math.min(maxMultiplier, 10000);
@@ -165,7 +171,7 @@ export function calculateAverageGameTime(
     const pdf = rtpFactor / (m * m);
 
     // Time to reach this multiplier
-    const timeMs = timeToReachMultiplier(m, rates);
+    const timeMs = timeToReachMultiplier(m, rates, endpoints);
 
     // Contribution to expected value
     // Use trapezoidal rule: weight by 0.5 for endpoints, 1.0 for interior points
@@ -180,7 +186,7 @@ export function calculateAverageGameTime(
   //                      = rtpFactor/maxMultiplier
   const probBeyondMax = rtpFactor / maxMultiplier;
   if (probBeyondMax > 0 && maxMultiplier < 10000) {
-    const timeAtMax = timeToReachMultiplier(maxMultiplier, rates);
+    const timeAtMax = timeToReachMultiplier(maxMultiplier, rates, endpoints);
     expectedTime += timeAtMax * probBeyondMax;
   }
 
