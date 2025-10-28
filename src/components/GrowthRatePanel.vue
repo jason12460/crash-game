@@ -62,6 +62,12 @@
         </button>
       </div>
 
+      <div class="avg-time-section">
+        <div class="avg-time-label">平均遊戲時間 (100x cap):</div>
+        <div class="avg-time-value">{{ averageGameTime }} 秒</div>
+        <div class="avg-time-hint">基於統計模擬的預期遊戲時長</div>
+      </div>
+
       <div class="preview-section">
         <h4>Real-time Preview (0-60s):</h4>
         <div class="preview-grid">
@@ -83,9 +89,11 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import { useGrowthRateConfig } from '@/composables/useGrowthRateConfig';
-import { calculateCurrentMultiplier } from '@/utils/crashFormula';
+import { calculateCurrentMultiplier, calculateAverageGameTime } from '@/utils/crashFormula';
+import { useRTPConfig } from '@/composables/useRTPConfig';
 
 const { rates, setGrowthRate, resetToDefaults } = useGrowthRateConfig();
+const { rtpConfig } = useRTPConfig();
 
 // Local input values
 const phase1Input = ref(rates.phase1);
@@ -134,6 +142,20 @@ const previewIntervals = computed(() => {
     }
   }
   return intervals;
+});
+
+// Calculate average game time with 100x cap using mathematical expectation
+const averageGameTime = computed(() => {
+  try {
+    const avgTime = calculateAverageGameTime(
+      100, // max multiplier
+      rtpConfig.rtpFactor || 0.97,
+      rates
+    );
+    return avgTime.toFixed(1);
+  } catch (e) {
+    return 'N/A';
+  }
 });
 </script>
 
@@ -223,6 +245,36 @@ const previewIntervals = computed(() => {
 
 .btn-secondary:active {
   transform: translateY(1px);
+}
+
+.avg-time-section {
+  margin-top: 16px;
+  padding: 12px;
+  background-color: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.avg-time-label {
+  color: #cccccc;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.avg-time-value {
+  color: #ffa500;
+  font-size: 24px;
+  font-weight: 700;
+  font-family: 'Courier New', monospace;
+  margin-bottom: 6px;
+}
+
+.avg-time-hint {
+  color: #888888;
+  font-size: 11px;
+  font-style: italic;
 }
 
 .preview-section {

@@ -71,3 +71,119 @@ export function calculateCurrentMultiplier(elapsedMs) {
   // 確保不超過爆炸點
   return currentMultiplier;
 }
+
+/**
+ * Calculate time (in milliseconds) needed to reach a target multiplier
+ * Uses the three-phase exponential growth model
+ * @param {number} targetMultiplier - Target multiplier to reach
+ * @param {object} rates - Growth rates object {phase1, phase2, phase3}
+ * @returns {number} Time in milliseconds needed to reach target multiplier
+ */
+export function timeToReachMultiplier(targetMultiplier, rates) {
+  if (targetMultiplier <= 1.0) return 0;
+
+  const baseMultiplier = 1.0;
+
+  // Calculate phase endpoints
+  const mult10s = baseMultiplier * Math.pow(Math.E, rates.phase1 * 10000);
+  const mult25s = mult10s * Math.pow(Math.E, rates.phase2 * 15000);
+
+  // Phase 1: 0-10s
+  if (targetMultiplier <= mult10s) {
+    // Solve: targetMultiplier = e^(r1 * t)
+    // ln(targetMultiplier) = r1 * t
+    // t = ln(targetMultiplier) / r1
+    return Math.log(targetMultiplier) / rates.phase1;
+  }
+
+  // Phase 2: 10-25s
+  if (targetMultiplier <= mult25s) {
+    // Solve: targetMultiplier = mult10s * e^(r2 * (t - 10000))
+    // targetMultiplier / mult10s = e^(r2 * (t - 10000))
+    // ln(targetMultiplier / mult10s) = r2 * (t - 10000)
+    // t = 10000 + ln(targetMultiplier / mult10s) / r2
+    const exponent = Math.log(targetMultiplier / mult10s) / rates.phase2;
+    return 10000 + exponent;
+  }
+
+  // Phase 3: 25s+
+  // Solve: targetMultiplier = mult25s * e^(r3 * (t - 25000))
+  // ln(targetMultiplier / mult25s) = r3 * (t - 25000)
+  // t = 25000 + ln(targetMultiplier / mult25s) / r3
+  const exponent = Math.log(targetMultiplier / mult25s) / rates.phase3;
+  return 25000 + exponent;
+}
+
+/**
+ * Calculate average game time using mathematical expectation
+ * Considers crash point probability distribution with a maximum cash-out limit
+ *
+ * Crash point formula: M = rtpFactor / (1 - R) where R ~ Uniform(0,1)
+ * PDF of M: f(m) = rtpFactor / m^2 for m >= rtpFactor
+ *
+ * E[Time] = ∫ time(m) * f(m) dm
+ *
+ * @param {number} maxMultiplier - Maximum cash-out multiplier (e.g., 100)
+ * @param {number} rtpFactor - RTP factor (default 0.97)
+ * @param {object} rates - Growth rates object {phase1, phase2, phase3}
+ * @returns {number} Average game time in seconds
+ */
+export function calculateAverageGameTime(
+  maxMultiplier = 100,
+  rtpFactor = 0.97,
+  rates
+) {
+  // Numerical integration using adaptive sampling
+  // Split into regions based on probability density
+
+  let expectedTime = 0;
+
+  // Integration parameters
+  const minMultiplier = rtpFactor; // Minimum possible crash point
+  const integrationSteps = 10000; // Fine-grained integration
+
+  // Calculate multiplier endpoints for each phase
+  const mult10s = Math.pow(Math.E, rates.phase1 * 10000);
+  const mult25s = mult10s * Math.pow(Math.E, rates.phase2 * 15000);
+
+  // Determine effective max (capped at maxMultiplier)
+  const effectiveMax = Math.min(maxMultiplier, 10000);
+
+  // Numerical integration using trapezoidal rule
+  // E[Time] = ∫[minMultiplier to effectiveMax] time(m) * pdf(m) dm
+  // where pdf(m) = rtpFactor / m^2
+
+  const dm = (effectiveMax - minMultiplier) / integrationSteps;
+
+  for (let i = 0; i <= integrationSteps; i++) {
+    const m = minMultiplier + i * dm;
+
+    // Skip if multiplier is below minimum
+    if (m < rtpFactor) continue;
+
+    // PDF of crash point: f(m) = rtpFactor / m^2
+    const pdf = rtpFactor / (m * m);
+
+    // Time to reach this multiplier
+    const timeMs = timeToReachMultiplier(m, rates);
+
+    // Contribution to expected value
+    // Use trapezoidal rule: weight by 0.5 for endpoints, 1.0 for interior points
+    const weight = (i === 0 || i === integrationSteps) ? 0.5 : 1.0;
+
+    expectedTime += timeMs * pdf * dm * weight;
+  }
+
+  // Add contribution from crashes beyond maxMultiplier (if any)
+  // P(M > maxMultiplier) = P(rtpFactor/(1-R) > maxMultiplier)
+  //                      = P(R > 1 - rtpFactor/maxMultiplier)
+  //                      = rtpFactor/maxMultiplier
+  const probBeyondMax = rtpFactor / maxMultiplier;
+  if (probBeyondMax > 0 && maxMultiplier < 10000) {
+    const timeAtMax = timeToReachMultiplier(maxMultiplier, rates);
+    expectedTime += timeAtMax * probBeyondMax;
+  }
+
+  // Return average time in seconds
+  return expectedTime / 1000;
+}
