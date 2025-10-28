@@ -186,7 +186,7 @@ watch(() => props.currentMultiplier, (newMultiplier) => {
 
     // 只在時間 > 0 時添加新數據點（第一個點 (0, 1.0) 已經在 RUNNING 狀態時添加）
     if (elapsedSeconds > 0) {
-      console.log('添加數據點:', elapsedSeconds.toFixed(2), 's', newMultiplier.toFixed(2) + 'x', '數據長度:', timeData.length);
+      //console.log('添加數據點:', elapsedSeconds.toFixed(2), 's', newMultiplier.toFixed(2) + 'x', '數據長度:', timeData.length);
       timeData.push(elapsedSeconds);
       multiplierData.push(newMultiplier);
 
@@ -213,7 +213,7 @@ watch(() => props.currentMultiplier, (newMultiplier) => {
       const targetMax = newMultiplier * 1.2;
       const newMaxY = Math.max(currentMaxY, targetMax);
       currentYRange = [1.0, newMaxY];
-      console.log('Y軸範圍更新:', currentYRange, '當前倍率:', newMultiplier);
+      //console.log('Y軸範圍更新:', currentYRange, '當前倍率:', newMultiplier);
 
       // 使用 setScale 來更新 Y 軸範圍
       chart.setScale('y', {
