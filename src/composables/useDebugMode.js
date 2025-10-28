@@ -7,10 +7,10 @@ const STORAGE_KEY = 'crashgame_debug';
  * Allows manual override of crash point for testing animation performance
  */
 
-// Shared state
+// Shared state with default values
 const debugState = reactive({
-  crashPointOverride: null, // null = disabled, number = override value
-  isActive: false
+  crashPointOverride: 100, // Default: 100x crash point
+  isActive: true           // Default: enabled
 });
 
 // Load from localStorage on initialization
@@ -22,9 +22,14 @@ try {
       debugState.crashPointOverride = data.crashPointOverride;
       debugState.isActive = true;
     }
+  } else {
+    // No stored data, save the default values
+    saveToStorage();
   }
 } catch (error) {
   console.error('Failed to load debug mode state:', error);
+  // On error, ensure defaults are saved
+  saveToStorage();
 }
 
 function saveToStorage() {
