@@ -82,7 +82,7 @@ export function useGameEngine() {
     }
   }
 
-  async function generateNewRound() {
+  async function generateNewRound(countdownSeconds = 5) {
     const { getRTPFactor } = useRTPConfig();
     const { getDebugCrashPoint, isDebugActive } = useDebugMode();
 
@@ -120,12 +120,12 @@ export function useGameEngine() {
     // Save the new round ID
     saveRoundId(newRoundId);
 
-    startCountdown();
+    startCountdown(countdownSeconds);
   }
 
-  function startCountdown() {
-    gameState.countdown = 5;
-    
+  function startCountdown(seconds = 5) {
+    gameState.countdown = seconds;
+
     if (countdownInterval) {
       clearInterval(countdownInterval);
     }
@@ -265,6 +265,15 @@ export function useGameEngine() {
     init();
   }
 
+  // Force restart current round immediately
+  function forceRestartRound() {
+    // Stop current round (cancels all timers)
+    cleanup();
+
+    // Start a new round with 1 second countdown
+    generateNewRound(1);
+  }
+
   onUnmounted(cleanup);
 
   return {
@@ -272,6 +281,7 @@ export function useGameEngine() {
     init,
     cleanup,
     resetGame,
+    forceRestartRound,
     on,
     off
   };

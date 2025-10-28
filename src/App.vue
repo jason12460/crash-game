@@ -63,7 +63,7 @@
           />
 
           <!-- Growth Rate Settings Panel -->
-          <GrowthRatePanel />
+          <GrowthRatePanel :on-force-restart="forceRestartRound" />
 
           <!-- Provably Fair Information -->
           <div class="fairness-info">
@@ -176,7 +176,7 @@ import { useBalance } from './composables/useBalance.js';
 import { useGameHistory } from './composables/useGameHistory.js';
 import { useRTPConfig } from './composables/useRTPConfig.js';
 
-const { gameState, init, cleanup, on } = useGameEngine();
+const { gameState, init, cleanup, on, forceRestartRound } = useGameEngine();
 const { balanceState, placeBet, cashOut, cancelBet, loseBet, clearCurrentBet, resetBalance } = useBalance();
 const { historyState, addRound, clearHistory } = useGameHistory();
 const { rtpConfig } = useRTPConfig();

@@ -91,6 +91,9 @@
         <button class="btn-secondary" @click="handleReset">
           Reset to Defaults
         </button>
+        <button class="btn-warning" @click="handleForceRestart">
+          Force Restart Round
+        </button>
       </div>
 
       <!-- Simulation Mode Section -->
@@ -161,6 +164,14 @@ import { useGrowthRateConfig } from '@/composables/useGrowthRateConfig';
 import { calculateCurrentMultiplier, calculateAverageGameTime } from '@/utils/crashFormula';
 import { useRTPConfig } from '@/composables/useRTPConfig';
 import { useSimulationMode } from '@/composables/useSimulationMode';
+
+// Define props
+const props = defineProps({
+  onForceRestart: {
+    type: Function,
+    required: true
+  }
+});
 
 const { rates, timeEndPoints, setGrowthRate, setPhaseEndTime, resetToDefaults } = useGrowthRateConfig();
 const { rtpConfig } = useRTPConfig();
@@ -242,6 +253,11 @@ const handleReset = () => {
   phase3Input.value = rates.phase3;
   phase1EndInput.value = timeEndPoints.phase1 / 1000;
   phase2EndInput.value = timeEndPoints.phase2 / 1000;
+};
+
+// Force restart the game round
+const handleForceRestart = () => {
+  props.onForceRestart();
 };
 
 // Real-time preview calculations for every 5 seconds up to 60 seconds
@@ -383,6 +399,27 @@ const averageGameTime = computed(() => {
 }
 
 .btn-secondary:active {
+  transform: translateY(1px);
+}
+
+.btn-warning {
+  padding: 8px 16px;
+  background-color: #c44545;
+  border: 1px solid #dd6666;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-warning:hover {
+  background-color: #d44545;
+  border-color: #ee7777;
+}
+
+.btn-warning:active {
   transform: translateY(1px);
 }
 
