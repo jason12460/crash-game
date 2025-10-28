@@ -3,6 +3,8 @@
  * Formula: M = 0.97 / (1 - R) where R is random value [0, 1)
  */
 
+import { useGrowthRateConfig } from '@/composables/useGrowthRateConfig';
+
 /**
  * Calculate crash point from random value
  * @param {number} randomValue - Random value between 0 and 1 (exclusive of 1)
@@ -37,10 +39,12 @@ export function calculateCurrentMultiplier(elapsedMs) {
 
   const baseMultiplier = 1.0;
   let currentMultiplier = baseMultiplier;
-  
-  const growthRate = 0.0000693;        // 前10秒：1x -> 2x
-  const secondPhaseGrowthRate = 0.0000921;  // 10-25秒：2x -> 8x (調整) // 0.0000921 8x  // 0.000110 10x
-  const thirdPhaseGrowthRate = 0.0001842;   // 25-35秒：10x -> 50x (調整) // 0.0001842 50x // 0.000230 100x
+
+  // Get growth rates from config (allows real-time adjustment)
+  const { rates } = useGrowthRateConfig();
+  const growthRate = rates.phase1;              // 前10秒：1x -> 2x
+  const secondPhaseGrowthRate = rates.phase2;   // 10-25秒：2x -> 8x
+  const thirdPhaseGrowthRate = rates.phase3;    // 25-35秒：10x -> 50x
   
   // 分段增長模型 - 使用累積方式避免斷層
   if (elapsedMs < 10000) {

@@ -59,6 +59,9 @@
             @cancel-bet="handleCancelBet"
           />
 
+          <!-- Growth Rate Settings Panel -->
+          <GrowthRatePanel />
+
           <!-- Provably Fair Information -->
           <div class="fairness-info">
             <div class="fairness-header">
@@ -163,6 +166,7 @@ import RTPSettings from './components/RTPSettings.vue';
 import RTPSimulator from './components/RTPSimulator.vue';
 import FairnessVerifier from './components/FairnessVerifier.vue';
 import DebugPanel from './components/DebugPanel.vue';
+import GrowthRatePanel from './components/GrowthRatePanel.vue';
 import { useGameEngine } from './composables/useGameEngine.js';
 import { useBalance } from './composables/useBalance.js';
 import { useGameHistory } from './composables/useGameHistory.js';
