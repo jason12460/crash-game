@@ -3,6 +3,7 @@ import { generateSeed, seedToRandom, hashSeed } from '../utils/randomGenerator.j
 import { calculateCrashPoint, calculateCurrentMultiplier } from '../utils/crashFormula.js';
 import { useRTPConfig } from './useRTPConfig.js';
 import { useDebugMode } from './useDebugMode.js';
+import { useSimulationMode } from './useSimulationMode.js';
 
 const STORAGE_KEY = 'crashgame_engine';
 
@@ -44,6 +45,7 @@ export function useGameEngine() {
   });
 
   let animationId = null;
+  let simulationIntervalId = null;
   let countdownInterval = null;
   const listeners = {
     roundStart: [],
@@ -142,7 +144,7 @@ export function useGameEngine() {
     gameState.currentRound.state = 'RUNNING';
     gameState.currentRound.startTime = Date.now();
     gameState.isRunning = true;
-    
+
     emit('roundStart', {
       roundId: gameState.currentRound.roundId,
       seedHash: gameState.currentRound.seedHash
@@ -158,7 +160,16 @@ export function useGameEngine() {
     console.log('multiplier35s', multiplier35s);
     console.log('multiplier40s', multiplier40s);
 
-    gameLoop();
+    // Check simulation mode and start appropriate timer
+    const { simulationMode } = useSimulationMode();
+    if (simulationMode.enabled) {
+      // Simulation mode: Use setInterval for discrete updates
+      simulationIntervalId = setInterval(gameLoop, simulationMode.updateInterval);
+      gameLoop(); // Call once immediately
+    } else {
+      // Smooth mode: Use requestAnimationFrame for 60 FPS
+      gameLoop();
+    }
   }
 
   function gameLoop() {
@@ -180,7 +191,11 @@ export function useGameEngine() {
       return;
     }
 
-    animationId = requestAnimationFrame(gameLoop);
+    // Continue loop in smooth mode (simulation mode uses setInterval)
+    const { simulationMode } = useSimulationMode();
+    if (!simulationMode.enabled) {
+      animationId = requestAnimationFrame(gameLoop);
+    }
   }
 
   function crashRound() {
@@ -188,9 +203,15 @@ export function useGameEngine() {
     gameState.currentRound.crashTime = Date.now();
     gameState.isRunning = false;
 
+    // Clean up both timer types
     if (animationId) {
       cancelAnimationFrame(animationId);
       animationId = null;
+    }
+
+    if (simulationIntervalId) {
+      clearInterval(simulationIntervalId);
+      simulationIntervalId = null;
     }
 
     emit('roundCrash', {
@@ -213,6 +234,10 @@ export function useGameEngine() {
     if (animationId) {
       cancelAnimationFrame(animationId);
       animationId = null;
+    }
+    if (simulationIntervalId) {
+      clearInterval(simulationIntervalId);
+      simulationIntervalId = null;
     }
     if (countdownInterval) {
       clearInterval(countdownInterval);

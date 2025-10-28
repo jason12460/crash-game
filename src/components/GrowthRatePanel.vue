@@ -93,6 +93,44 @@
         </button>
       </div>
 
+      <!-- Simulation Mode Section -->
+      <div class="simulation-section">
+        <div class="simulation-header">
+          <label class="toggle-label">
+            <input
+              type="checkbox"
+              v-model="simulationEnabled"
+              @change="toggleSimulation"
+              class="toggle-checkbox"
+            />
+            <span class="toggle-text">啟用後端模擬模式</span>
+          </label>
+        </div>
+        <div class="simulation-controls">
+          <div class="interval-input-group">
+            <label for="interval-input" class="input-label">更新間隔 (ms):</label>
+            <input
+              id="interval-input"
+              v-model.number="updateIntervalInput"
+              type="number"
+              step="10"
+              min="10"
+              max="1000"
+              @input="handleIntervalChange"
+              :disabled="!simulationEnabled"
+            />
+          </div>
+          <div class="simulation-status">
+            <span v-if="simulationEnabled" class="status-active">
+              模擬模式：每 {{ simulationMode.updateInterval }}ms 更新
+            </span>
+            <span v-else class="status-smooth">
+              流暢模式：60 FPS
+            </span>
+          </div>
+        </div>
+      </div>
+
       <div class="avg-time-section">
         <div class="avg-time-label">平均遊戲時間 (100x cap):</div>
         <div class="avg-time-value">{{ averageGameTime }} 秒</div>
@@ -122,9 +160,11 @@ import { ref, computed, watch } from 'vue';
 import { useGrowthRateConfig } from '@/composables/useGrowthRateConfig';
 import { calculateCurrentMultiplier, calculateAverageGameTime } from '@/utils/crashFormula';
 import { useRTPConfig } from '@/composables/useRTPConfig';
+import { useSimulationMode } from '@/composables/useSimulationMode';
 
 const { rates, timeEndPoints, setGrowthRate, setPhaseEndTime, resetToDefaults } = useGrowthRateConfig();
 const { rtpConfig } = useRTPConfig();
+const { simulationMode, enableSimulation, disableSimulation, setUpdateInterval } = useSimulationMode();
 
 // Local input values for growth rates
 const phase1Input = ref(rates.phase1);
@@ -134,6 +174,10 @@ const phase3Input = ref(rates.phase3);
 // Local input values for time boundaries (in seconds)
 const phase1EndInput = ref(timeEndPoints.phase1 / 1000);
 const phase2EndInput = ref(timeEndPoints.phase2 / 1000);
+
+// Local input values for simulation mode
+const simulationEnabled = ref(simulationMode.enabled);
+const updateIntervalInput = ref(simulationMode.updateInterval);
 
 // Watch for external changes to rates
 watch(
@@ -165,6 +209,30 @@ const updateRate = (phase, value) => {
 const updateEndTime = (phase, timeMs) => {
   setPhaseEndTime(phase, timeMs);
 };
+
+// Toggle simulation mode
+const toggleSimulation = () => {
+  if (simulationEnabled.value) {
+    enableSimulation();
+  } else {
+    disableSimulation();
+  }
+};
+
+// Handle interval change
+const handleIntervalChange = () => {
+  setUpdateInterval(updateIntervalInput.value);
+};
+
+// Watch for external changes to simulation mode
+watch(
+  () => simulationMode,
+  (newMode) => {
+    simulationEnabled.value = newMode.enabled;
+    updateIntervalInput.value = newMode.updateInterval;
+  },
+  { deep: true, immediate: true }
+);
 
 // Reset to default values
 const handleReset = () => {
@@ -316,6 +384,92 @@ const averageGameTime = computed(() => {
 
 .btn-secondary:active {
   transform: translateY(1px);
+}
+
+.simulation-section {
+  margin-top: 16px;
+  padding: 12px;
+  background-color: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 4px;
+}
+
+.simulation-header {
+  margin-bottom: 12px;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-checkbox {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #4a90e2;
+}
+
+.toggle-text {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.simulation-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.interval-input-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.interval-input-group input {
+  flex: 1;
+  padding: 6px 10px;
+  background-color: #1a1a1a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 13px;
+  font-family: 'Courier New', monospace;
+}
+
+.interval-input-group input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.interval-input-group input:focus {
+  outline: none;
+  border-color: #4a90e2;
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+}
+
+.simulation-status {
+  padding: 8px;
+  background-color: #1a1a1a;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.status-active {
+  color: #ffa500;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-smooth {
+  color: #00ff88;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .avg-time-section {
