@@ -38,6 +38,9 @@
             :state="gameState.currentRound.state"
           />
 
+          <!-- Growth Curve Chart -->
+          <GrowthCurveChart />
+
           <!-- Round Info -->
           <div class="round-info">
             <span>Round #{{ gameState.currentRound.roundId }}</span>
@@ -167,6 +170,7 @@ import RTPSimulator from './components/RTPSimulator.vue';
 import FairnessVerifier from './components/FairnessVerifier.vue';
 import DebugPanel from './components/DebugPanel.vue';
 import GrowthRatePanel from './components/GrowthRatePanel.vue';
+import GrowthCurveChart from './components/GrowthCurveChart.vue';
 import { useGameEngine } from './composables/useGameEngine.js';
 import { useBalance } from './composables/useBalance.js';
 import { useGameHistory } from './composables/useGameHistory.js';
