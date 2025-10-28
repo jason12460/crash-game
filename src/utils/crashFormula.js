@@ -27,10 +27,9 @@ export function calculateCrashPoint(randomValue, rtpFactor = 0.97) {
 }
 
 /**
- * Calculate current multiplier based on elapsed time using segmented growth model
+ * Calculate current multiplier based on elapsed time using N-phase growth model
  * @param {number} elapsedMs - Milliseconds since round started
- * @param {number} crashPoint - The target crash multiplier (only used to cap the value)
- * @returns {number} Current multiplier (1.00 to crashPoint)
+ * @returns {number} Current multiplier (starting from 1.00)
  */
 export function calculateCurrentMultiplier(elapsedMs) {
   if (elapsedMs < 0) {
@@ -38,86 +37,106 @@ export function calculateCurrentMultiplier(elapsedMs) {
   }
 
   const baseMultiplier = 1.0;
-  let currentMultiplier = baseMultiplier;
 
-  // Get growth rates and time boundaries from config (allows real-time adjustment)
-  const { rates, timeEndPoints } = useGrowthRateConfig();
-  const growthRate = rates.phase1;
-  const secondPhaseGrowthRate = rates.phase2;
-  const thirdPhaseGrowthRate = rates.phase3;
-  const phase1End = timeEndPoints.phase1;
-  const phase2End = timeEndPoints.phase2;
+  // Get dynamic phase configuration
+  const { phases } = useGrowthRateConfig();
 
-  // 分段增長模型 - 使用累積方式避免斷層
-  if (elapsedMs < phase1End) {
-    // Phase 1: 慢增長階段
-    currentMultiplier = baseMultiplier * Math.pow(Math.E, growthRate * elapsedMs);
-  } else if (elapsedMs < phase2End) {
-    // Phase 2: 中等增長階段
-    // 先計算 Phase 1 的倍數
-    const firstPhaseMultiplier = baseMultiplier * Math.pow(Math.E, growthRate * phase1End);
-    // 再計算剩餘時間的增長
-    const remainingTime = elapsedMs - phase1End;
-
-    currentMultiplier = firstPhaseMultiplier * Math.pow(Math.E, secondPhaseGrowthRate * remainingTime);
-  } else {
-    // Phase 3: 快速增長階段
-    // 先計算前兩階段的倍數
-    const firstPhaseMultiplier = baseMultiplier * Math.pow(Math.E, growthRate * phase1End);
-    const phase2Duration = phase2End - phase1End;
-    const secondPhaseMultiplier = firstPhaseMultiplier * Math.pow(Math.E, secondPhaseGrowthRate * phase2Duration);
-    // 再計算剩餘時間的增長
-    const remainingTime = elapsedMs - phase2End;
-    currentMultiplier = secondPhaseMultiplier * Math.pow(Math.E, thirdPhaseGrowthRate * remainingTime);
+  if (!phases || phases.length === 0) {
+    return baseMultiplier;
   }
 
-  // 確保不超過爆炸點
-  return currentMultiplier;
+  // Find which phase we're currently in
+  let currentPhaseIndex = 0;
+  for (let i = 0; i < phases.length; i++) {
+    if (phases[i].endTime === null || elapsedMs < phases[i].endTime) {
+      currentPhaseIndex = i;
+      break;
+    }
+  }
+
+  // Calculate cumulative multiplier up to current phase
+  let cumulativeMultiplier = baseMultiplier;
+  let previousEndTime = 0;
+
+  // Accumulate growth from all completed phases
+  for (let i = 0; i < currentPhaseIndex; i++) {
+    const phase = phases[i];
+    const phaseDuration = phase.endTime - previousEndTime;
+    cumulativeMultiplier *= Math.pow(Math.E, phase.rate * phaseDuration);
+    previousEndTime = phase.endTime;
+  }
+
+  // Add growth from current phase (partial)
+  const currentPhase = phases[currentPhaseIndex];
+  const timeInCurrentPhase = elapsedMs - previousEndTime;
+  cumulativeMultiplier *= Math.pow(Math.E, currentPhase.rate * timeInCurrentPhase);
+
+  return cumulativeMultiplier;
 }
 
 /**
  * Calculate time (in milliseconds) needed to reach a target multiplier
- * Uses the three-phase exponential growth model
+ * Uses the N-phase exponential growth model
  * @param {number} targetMultiplier - Target multiplier to reach
- * @param {object} rates - Growth rates object {phase1, phase2, phase3}
- * @param {object} timeEndPoints - Time boundaries {phase1, phase2} in milliseconds
+ * @param {object|array} ratesOrPhases - Either legacy rates object or phases array
+ * @param {object} timeEndPoints - (Legacy) Time boundaries, ignored if phases array provided
  * @returns {number} Time in milliseconds needed to reach target multiplier
  */
-export function timeToReachMultiplier(targetMultiplier, rates, timeEndPoints = null) {
+export function timeToReachMultiplier(targetMultiplier, ratesOrPhases = null, timeEndPoints = null) {
   if (targetMultiplier <= 1.0) return 0;
 
-  // Use provided timeEndPoints or get from config
-  const endpoints = timeEndPoints || useGrowthRateConfig().timeEndPoints;
-  const phase1End = endpoints.phase1;
-  const phase2End = endpoints.phase2;
+  let phases;
+
+  // Support both legacy format and new array format
+  if (Array.isArray(ratesOrPhases)) {
+    // New format: phases array
+    phases = ratesOrPhases;
+  } else if (ratesOrPhases && ratesOrPhases.phase1 !== undefined) {
+    // Legacy format: convert to phases array
+    const endpoints = timeEndPoints || useGrowthRateConfig().timeEndPoints;
+    phases = [
+      { rate: ratesOrPhases.phase1, endTime: endpoints.phase1 },
+      { rate: ratesOrPhases.phase2, endTime: endpoints.phase2 },
+      { rate: ratesOrPhases.phase3, endTime: null }
+    ];
+  } else {
+    // No rates provided, get from config
+    phases = useGrowthRateConfig().phases;
+  }
 
   const baseMultiplier = 1.0;
+  let cumulativeMultiplier = baseMultiplier;
+  let previousEndTime = 0;
 
-  // Calculate phase endpoint multipliers
-  const multPhase1End = baseMultiplier * Math.pow(Math.E, rates.phase1 * phase1End);
-  const phase2Duration = phase2End - phase1End;
-  const multPhase2End = multPhase1End * Math.pow(Math.E, rates.phase2 * phase2Duration);
+  // Iterate through phases to find where target is reached
+  for (let i = 0; i < phases.length; i++) {
+    const phase = phases[i];
 
-  // Phase 1
-  if (targetMultiplier <= multPhase1End) {
-    // Solve: targetMultiplier = e^(r1 * t)
-    // t = ln(targetMultiplier) / r1
-    return Math.log(targetMultiplier) / rates.phase1;
+    // Calculate multiplier at end of this phase
+    let phaseEndMultiplier;
+    if (phase.endTime !== null) {
+      const phaseDuration = phase.endTime - previousEndTime;
+      phaseEndMultiplier = cumulativeMultiplier * Math.pow(Math.E, phase.rate * phaseDuration);
+    } else {
+      // Infinite phase - will always contain the target
+      phaseEndMultiplier = Infinity;
+    }
+
+    // Check if target is reached within this phase
+    if (targetMultiplier <= phaseEndMultiplier) {
+      // Solve: targetMultiplier = cumulativeMultiplier * e^(rate * t)
+      // t = ln(targetMultiplier / cumulativeMultiplier) / rate
+      const timeInPhase = Math.log(targetMultiplier / cumulativeMultiplier) / phase.rate;
+      return previousEndTime + timeInPhase;
+    }
+
+    // Target not reached yet, move to next phase
+    cumulativeMultiplier = phaseEndMultiplier;
+    previousEndTime = phase.endTime;
   }
 
-  // Phase 2
-  if (targetMultiplier <= multPhase2End) {
-    // Solve: targetMultiplier = multPhase1End * e^(r2 * (t - phase1End))
-    // t = phase1End + ln(targetMultiplier / multPhase1End) / r2
-    const exponent = Math.log(targetMultiplier / multPhase1End) / rates.phase2;
-    return phase1End + exponent;
-  }
-
-  // Phase 3
-  // Solve: targetMultiplier = multPhase2End * e^(r3 * (t - phase2End))
-  // t = phase2End + ln(targetMultiplier / multPhase2End) / r3
-  const exponent = Math.log(targetMultiplier / multPhase2End) / rates.phase3;
-  return phase2End + exponent;
+  // Should never reach here if last phase is infinite
+  return previousEndTime;
 }
 
 /**
@@ -131,20 +150,31 @@ export function timeToReachMultiplier(targetMultiplier, rates, timeEndPoints = n
  *
  * @param {number} maxMultiplier - Maximum cash-out multiplier (e.g., 100)
  * @param {number} rtpFactor - RTP factor (default 0.97)
- * @param {object} rates - Growth rates object {phase1, phase2, phase3}
+ * @param {object|array} ratesOrPhases - Either legacy rates object or phases array
+ * @param {object} timeEndPoints - (Legacy) Time boundaries, ignored if phases array provided
  * @returns {number} Average game time in seconds
  */
 export function calculateAverageGameTime(
   maxMultiplier = 100,
   rtpFactor = 0.97,
-  rates,
+  ratesOrPhases = null,
   timeEndPoints = null
 ) {
-  // Get time endpoints
-  const endpoints = timeEndPoints || useGrowthRateConfig().timeEndPoints;
-
-  // Numerical integration using adaptive sampling
-  // Split into regions based on probability density
+  // Get phases (supports both legacy and new format)
+  let phases;
+  if (Array.isArray(ratesOrPhases)) {
+    phases = ratesOrPhases;
+  } else if (ratesOrPhases && ratesOrPhases.phase1 !== undefined) {
+    // Legacy format
+    const endpoints = timeEndPoints || useGrowthRateConfig().timeEndPoints;
+    phases = [
+      { rate: ratesOrPhases.phase1, endTime: endpoints.phase1 },
+      { rate: ratesOrPhases.phase2, endTime: endpoints.phase2 },
+      { rate: ratesOrPhases.phase3, endTime: null }
+    ];
+  } else {
+    phases = useGrowthRateConfig().phases;
+  }
 
   let expectedTime = 0;
 
@@ -171,7 +201,7 @@ export function calculateAverageGameTime(
     const pdf = rtpFactor / (m * m);
 
     // Time to reach this multiplier
-    const timeMs = timeToReachMultiplier(m, rates, endpoints);
+    const timeMs = timeToReachMultiplier(m, phases);
 
     // Contribution to expected value
     // Use trapezoidal rule: weight by 0.5 for endpoints, 1.0 for interior points
@@ -186,7 +216,7 @@ export function calculateAverageGameTime(
   //                      = rtpFactor/maxMultiplier
   const probBeyondMax = rtpFactor / maxMultiplier;
   if (probBeyondMax > 0 && maxMultiplier < 10000) {
-    const timeAtMax = timeToReachMultiplier(maxMultiplier, rates, endpoints);
+    const timeAtMax = timeToReachMultiplier(maxMultiplier, phases);
     expectedTime += timeAtMax * probBeyondMax;
   }
 

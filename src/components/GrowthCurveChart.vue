@@ -15,14 +15,14 @@ import 'uplot/dist/uPlot.min.css';
 import { useGrowthRateConfig } from '@/composables/useGrowthRateConfig';
 import { calculateCurrentMultiplier, timeToReachMultiplier } from '@/utils/crashFormula';
 
-const { rates } = useGrowthRateConfig();
+const { phases } = useGrowthRateConfig();
 
 const chartContainer = ref(null);
 let chart = null;
 const timeToHundredX = ref(null);
 
 // 生成曲線數據
-function generateCurveData(growthRates, maxTime = 60) {
+function generateCurveData(maxTime = 60) {
   const timeData = [];
   const multiplierData = [];
   const step = 100; // 每100ms一個數據點
@@ -38,8 +38,7 @@ function generateCurveData(growthRates, maxTime = 60) {
 
     // 記錄到達100x的時間
     if (!reached100x && mult >= 100) {
-      const { timeEndPoints } = useGrowthRateConfig();
-      timeToHundredX.value = timeToReachMultiplier(100, growthRates, timeEndPoints) / 1000;
+      timeToHundredX.value = timeToReachMultiplier(100, phases) / 1000;
       reached100x = true;
     }
 
@@ -57,8 +56,22 @@ function generateCurveData(growthRates, maxTime = 60) {
   return { timeData, multiplierData };
 }
 
-// 創建階段背景插件
+// 創建階段背景插件 - 支持動態 N 個階段
 function createPhaseBackgrounds() {
+  // 定義顏色循環（最多10個階段）
+  const phaseColors = [
+    'rgba(74, 144, 226, 0.08)',   // 藍色
+    'rgba(0, 255, 136, 0.08)',    // 綠色
+    'rgba(255, 165, 0, 0.08)',    // 橙色
+    'rgba(255, 100, 255, 0.08)',  // 紫色
+    'rgba(255, 255, 0, 0.08)',    // 黃色
+    'rgba(0, 255, 255, 0.08)',    // 青色
+    'rgba(255, 50, 50, 0.08)',    // 紅色
+    'rgba(100, 255, 100, 0.08)',  // 淺綠
+    'rgba(200, 150, 255, 0.08)',  // 淡紫
+    'rgba(255, 200, 100, 0.08)'   // 淡橙
+  ];
+
   return {
     hooks: {
       drawClear: [
@@ -66,32 +79,36 @@ function createPhaseBackgrounds() {
           const { ctx } = u;
           const { width, height, top, left } = u.bbox;
 
-          // 獲取動態時間邊界
-          const { timeEndPoints } = useGrowthRateConfig();
-          const phase1EndSeconds = timeEndPoints.phase1 / 1000;
-          const phase2EndSeconds = timeEndPoints.phase2 / 1000;
-
-          // 計算階段邊界在畫布上的像素位置
-          const phase1End = u.valToPos(phase1EndSeconds, 'x', true);
-          const phase2End = u.valToPos(phase2EndSeconds, 'x', true);
-
           ctx.save();
 
-          // Phase 1 背景 (0-10s) - 淺藍色
-          ctx.fillStyle = 'rgba(74, 144, 226, 0.08)';
-          ctx.fillRect(left, top, phase1End - left, height);
+          // 獲取動態階段配置
+          const { phases } = useGrowthRateConfig();
 
-          // Phase 2 背景 (10-25s) - 淺綠色
-          if (phase2End > phase1End) {
-            ctx.fillStyle = 'rgba(0, 255, 136, 0.08)';
-            ctx.fillRect(phase1End, top, phase2End - phase1End, height);
-          }
+          let previousX = left;
+          let previousEndTime = 0;
 
-          // Phase 3 背景 (25s+) - 淺橙色
-          if (width + left > phase2End) {
-            ctx.fillStyle = 'rgba(255, 165, 0, 0.08)';
-            ctx.fillRect(phase2End, top, width + left - phase2End, height);
-          }
+          // 繪製每個階段的背景
+          phases.forEach((phase, index) => {
+            const color = phaseColors[index % phaseColors.length];
+
+            if (phase.endTime !== null) {
+              // 有限階段：繪製從 previousX 到 endTime 的背景
+              const endTimeSeconds = phase.endTime / 1000;
+              const endX = u.valToPos(endTimeSeconds, 'x', true);
+
+              if (endX > previousX) {
+                ctx.fillStyle = color;
+                ctx.fillRect(previousX, top, endX - previousX, height);
+              }
+
+              previousX = endX;
+              previousEndTime = phase.endTime;
+            } else {
+              // 無限階段（最後一個）：繪製到畫布右邊界
+              ctx.fillStyle = color;
+              ctx.fillRect(previousX, top, width + left - previousX, height);
+            }
+          });
 
           // 繪製100x水平線
           const y100 = u.valToPos(100, 'y', true);
@@ -117,7 +134,7 @@ function createPhaseBackgrounds() {
 function initChart() {
   if (!chartContainer.value) return;
 
-  const { timeData, multiplierData } = generateCurveData(rates);
+  const { timeData, multiplierData } = generateCurveData();
 
   const maxTime = Math.max(...timeData, 60);
   const maxMult = Math.max(...multiplierData, 100);
@@ -196,7 +213,7 @@ function initChart() {
 function updateChart() {
   if (!chart) return;
 
-  const { timeData, multiplierData } = generateCurveData(rates);
+  const { timeData, multiplierData } = generateCurveData();
   const maxTime = Math.max(...timeData, 60);
   const maxMult = Math.max(...multiplierData, 100);
 
@@ -215,19 +232,9 @@ onMounted(() => {
   initChart();
 });
 
-// 監聽成長率變化
+// 監聽階段配置變化（包括成長率、時間邊界、階段數量）
 watch(
-  () => rates,
-  () => {
-    updateChart();
-  },
-  { deep: true }
-);
-
-// 監聽時間邊界變化
-const { timeEndPoints } = useGrowthRateConfig();
-watch(
-  () => timeEndPoints,
+  () => phases,
   () => {
     updateChart();
   },

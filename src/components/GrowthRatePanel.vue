@@ -5,86 +5,82 @@
     </div>
 
     <div class="panel-content">
-      <!-- Phase 1 -->
-      <div class="rate-input-group">
-        <label class="phase-label">Phase 1:</label>
-        <div class="phase-inputs">
-          <div class="time-input">
-            <label for="phase1-end" class="input-label">End Time (s):</label>
-            <input
-              id="phase1-end"
-              v-model.number="phase1EndInput"
-              type="number"
-              step="1"
-              min="1"
-              @input="updateEndTime(1, phase1EndInput * 1000)"
-            />
+      <!-- Dynamic Phases -->
+      <div v-for="(phase, index) in localPhases" :key="phase.id" class="phase-container">
+        <!-- Insert button (between phases) -->
+        <div v-if="index > 0" class="insert-button-container">
+          <button
+            class="btn-insert"
+            @click="handleAddPhase(index - 1)"
+            :disabled="!canAddPhase"
+            title="Insert phase here"
+          >
+            + Add Phase
+          </button>
+        </div>
+
+        <div class="rate-input-group">
+          <div class="phase-header-row">
+            <label class="phase-label">
+              Phase {{ index + 1 }}
+              <span v-if="isLastPhase(index)" class="infinity-badge">∞</span>
+            </label>
+            <button
+              v-if="canRemove(index)"
+              class="btn-delete"
+              @click="handleRemovePhase(index)"
+              title="Delete this phase"
+            >
+              🗑️
+            </button>
           </div>
-          <div class="rate-input">
-            <label for="phase1-rate" class="input-label">Growth Rate:</label>
-            <input
-              id="phase1-rate"
-              v-model.number="phase1Input"
-              type="number"
-              step="0.0000001"
-              min="0.000001"
-              max="0.001"
-              @input="updateRate(1, phase1Input)"
-            />
+          <div class="phase-inputs">
+            <div class="time-input">
+              <label v-if="!isLastPhase(index)" :for="`phase${index}-end`" class="input-label">
+                End Time (s):
+              </label>
+              <span v-else class="input-label infinite-label">
+                Duration: Infinite
+              </span>
+              <input
+                v-if="!isLastPhase(index)"
+                :id="`phase${index}-end`"
+                v-model.number="phase.endTimeSeconds"
+                type="number"
+                step="1"
+                min="1"
+                @input="updateEndTime(index, phase.endTimeSeconds * 1000)"
+              />
+            </div>
+            <div class="rate-input">
+              <label :for="`phase${index}-rate`" class="input-label">Growth Rate:</label>
+              <input
+                :id="`phase${index}-rate`"
+                v-model.number="phase.rate"
+                type="number"
+                step="0.0000001"
+                min="0.000001"
+                max="0.001"
+                @input="updateRate(index, phase.rate)"
+              />
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Phase 2 -->
-      <div class="rate-input-group">
-        <label class="phase-label">Phase 2:</label>
-        <div class="phase-inputs">
-          <div class="time-input">
-            <label for="phase2-end" class="input-label">End Time (s):</label>
-            <input
-              id="phase2-end"
-              v-model.number="phase2EndInput"
-              type="number"
-              step="1"
-              min="1"
-              @input="updateEndTime(2, phase2EndInput * 1000)"
-            />
-          </div>
-          <div class="rate-input">
-            <label for="phase2-rate" class="input-label">Growth Rate:</label>
-            <input
-              id="phase2-rate"
-              v-model.number="phase2Input"
-              type="number"
-              step="0.0000001"
-              min="0.000001"
-              max="0.001"
-              @input="updateRate(2, phase2Input)"
-            />
-          </div>
-        </div>
-      </div>
-
-      <!-- Phase 3 -->
-      <div class="rate-input-group">
-        <label class="phase-label">Phase 3:</label>
-        <div class="phase-inputs">
-          <div class="time-input">
-            <span class="input-label">Start Time (s): {{ (timeEndPoints.phase2 / 1000).toFixed(0) }}+</span>
-          </div>
-          <div class="rate-input">
-            <label for="phase3-rate" class="input-label">Growth Rate:</label>
-            <input
-              id="phase3-rate"
-              v-model.number="phase3Input"
-              type="number"
-              step="0.0000001"
-              min="0.000001"
-              max="0.001"
-              @input="updateRate(3, phase3Input)"
-            />
-          </div>
-        </div>
+      <!-- Append button (at end) -->
+      <div class="append-button-container">
+        <button
+          class="btn-append"
+          @click="handleAddPhase(-1)"
+          :disabled="!canAddPhase"
+          title="Add phase at end"
+        >
+          + Add Phase at End
+        </button>
+        <span v-if="!canAddPhase" class="limit-hint">
+          (Maximum {{ maxPhases }} phases reached)
+        </span>
       </div>
 
       <div class="button-group">
@@ -173,52 +169,74 @@ const props = defineProps({
   }
 });
 
-const { rates, timeEndPoints, setGrowthRate, setPhaseEndTime, resetToDefaults } = useGrowthRateConfig();
+const {
+  phases,
+  getPhases,
+  getPhaseCount,
+  setGrowthRate,
+  setPhaseEndTime,
+  addPhase,
+  removePhase,
+  canRemovePhase,
+  resetToDefaults
+} = useGrowthRateConfig();
+
 const { rtpConfig } = useRTPConfig();
 const { simulationMode, enableSimulation, disableSimulation, setUpdateInterval } = useSimulationMode();
 
-// Local input values for growth rates
-const phase1Input = ref(rates.phase1);
-const phase2Input = ref(rates.phase2);
-const phase3Input = ref(rates.phase3);
+// Constants
+const maxPhases = 10;
 
-// Local input values for time boundaries (in seconds)
-const phase1EndInput = ref(timeEndPoints.phase1 / 1000);
-const phase2EndInput = ref(timeEndPoints.phase2 / 1000);
+// Local phases with seconds conversion for inputs
+const localPhases = ref([]);
+
+// Sync local phases with config
+const syncLocalPhases = () => {
+  localPhases.value = phases.map(phase => ({
+    ...phase,
+    endTimeSeconds: phase.endTime !== null ? phase.endTime / 1000 : null
+  }));
+};
+
+// Initialize local phases
+syncLocalPhases();
+
+// Watch for changes from config
+watch(
+  () => phases,
+  () => {
+    syncLocalPhases();
+  },
+  { deep: true }
+);
 
 // Local input values for simulation mode
 const simulationEnabled = ref(simulationMode.enabled);
 const updateIntervalInput = ref(simulationMode.updateInterval);
 
-// Watch for external changes to rates
-watch(
-  () => rates,
-  (newRates) => {
-    phase1Input.value = newRates.phase1;
-    phase2Input.value = newRates.phase2;
-    phase3Input.value = newRates.phase3;
-  },
-  { deep: true, immediate: true }
-);
+// Check if phase can be added
+const canAddPhase = computed(() => {
+  return getPhaseCount() < maxPhases;
+});
 
-// Watch for external changes to time endpoints
-watch(
-  () => timeEndPoints,
-  (newEndPoints) => {
-    phase1EndInput.value = newEndPoints.phase1 / 1000;
-    phase2EndInput.value = newEndPoints.phase2 / 1000;
-  },
-  { deep: true, immediate: true }
-);
-
-// Update rate with validation
-const updateRate = (phase, value) => {
-  setGrowthRate(phase, value);
+// Check if a phase is the last one (infinite)
+const isLastPhase = (index) => {
+  return index === localPhases.value.length - 1;
 };
 
-// Update end time with validation
-const updateEndTime = (phase, timeMs) => {
-  setPhaseEndTime(phase, timeMs);
+// Check if a phase can be removed
+const canRemove = (index) => {
+  return canRemovePhase(index);
+};
+
+// Update rate with validation (now uses index instead of phase number)
+const updateRate = (index, value) => {
+  setGrowthRate(index, value);
+};
+
+// Update end time with validation (now uses index instead of phase number)
+const updateEndTime = (index, timeMs) => {
+  setPhaseEndTime(index, timeMs);
 };
 
 // Toggle simulation mode
@@ -245,14 +263,24 @@ watch(
   { deep: true, immediate: true }
 );
 
-// Reset to default values
+// Handle adding a phase
+const handleAddPhase = (afterIndex) => {
+  if (addPhase(afterIndex)) {
+    syncLocalPhases();
+  }
+};
+
+// Handle removing a phase
+const handleRemovePhase = (index) => {
+  if (removePhase(index)) {
+    syncLocalPhases();
+  }
+};
+
+// Reset to default values (restores 3-phase structure)
 const handleReset = () => {
   resetToDefaults();
-  phase1Input.value = rates.phase1;
-  phase2Input.value = rates.phase2;
-  phase3Input.value = rates.phase3;
-  phase1EndInput.value = timeEndPoints.phase1 / 1000;
-  phase2EndInput.value = timeEndPoints.phase2 / 1000;
+  syncLocalPhases();
 };
 
 // Force restart the game round
@@ -286,7 +314,7 @@ const averageGameTime = computed(() => {
     const avgTime = calculateAverageGameTime(
       100, // max multiplier
       rtpConfig.rtpFactor || 0.97,
-      rates
+      phases // Now uses phases array directly
     );
     return avgTime.toFixed(1);
   } catch (e) {
@@ -322,6 +350,78 @@ const averageGameTime = computed(() => {
   gap: 12px;
 }
 
+.phase-container {
+  position: relative;
+}
+
+.insert-button-container {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0;
+}
+
+.btn-insert {
+  padding: 4px 12px;
+  background-color: #2a5a2a;
+  border: 1px solid #3a7a3a;
+  border-radius: 4px;
+  color: #88ff88;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-insert:hover:not(:disabled) {
+  background-color: #3a6a3a;
+  border-color: #4a8a4a;
+}
+
+.btn-insert:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.append-button-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin: 12px 0;
+  padding: 12px;
+  background-color: #2a2a2a;
+  border: 1px dashed #444;
+  border-radius: 4px;
+}
+
+.btn-append {
+  padding: 8px 16px;
+  background-color: #2a5a2a;
+  border: 1px solid #3a7a3a;
+  border-radius: 4px;
+  color: #88ff88;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-append:hover:not(:disabled) {
+  background-color: #3a6a3a;
+  border-color: #4a8a4a;
+}
+
+.btn-append:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.limit-hint {
+  color: #888;
+  font-size: 11px;
+  font-style: italic;
+}
+
 .rate-input-group {
   display: flex;
   flex-direction: column;
@@ -329,12 +429,59 @@ const averageGameTime = computed(() => {
   padding: 12px;
   background-color: #2a2a2a;
   border-radius: 4px;
+  border: 1px solid #333;
+}
+
+.phase-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .phase-label {
   color: #ffffff;
   font-size: 14px;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.infinity-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  background-color: #4a4a00;
+  border: 1px solid #6a6a00;
+  border-radius: 3px;
+  color: #ffff88;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.btn-delete {
+  padding: 4px 8px;
+  background-color: #5a2a2a;
+  border: 1px solid #7a3a3a;
+  border-radius: 4px;
+  color: #ff8888;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-delete:hover {
+  background-color: #6a3a3a;
+  border-color: #8a4a4a;
+}
+
+.btn-delete:active {
+  transform: scale(0.95);
+}
+
+.infinite-label {
+  color: #ffff88;
+  font-weight: 600;
+  font-style: italic;
 }
 
 .phase-inputs {
