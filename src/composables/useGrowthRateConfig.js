@@ -241,10 +241,10 @@ export function useGrowthRateConfig() {
     }
 
     // Cannot remove the last phase (must always have an infinite phase)
-    if (index === state.phases.length - 1) {
-      console.warn('Cannot remove last phase (must remain infinite)');
-      return false;
-    }
+    // if (index === state.phases.length - 1) {
+    //   console.warn('Cannot remove last phase (must remain infinite)');
+    //   return false;
+    // }
 
     return true;
   };
@@ -261,7 +261,12 @@ export function useGrowthRateConfig() {
 
   // Reset to default 3-phase structure
   const resetToDefaults = () => {
-    state.phases = JSON.parse(JSON.stringify(DEFAULT_CONFIG.phases));
+    // Clear existing phases
+    state.phases.splice(0, state.phases.length);
+
+    // Add default phases
+    const defaultPhases = JSON.parse(JSON.stringify(DEFAULT_CONFIG.phases));
+    defaultPhases.forEach(phase => state.phases.push(phase));
   };
 
   const getDefaultConfig = () => {
