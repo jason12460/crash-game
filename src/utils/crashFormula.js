@@ -30,7 +30,7 @@ export function calculateCrashPoint(randomValue, rtpFactor = 0.97) {
  * @param {number} crashPoint - The target crash multiplier (only used to cap the value)
  * @returns {number} Current multiplier (1.00 to crashPoint)
  */
-export function calculateCurrentMultiplier(elapsedMs, crashPoint) {
+export function calculateCurrentMultiplier(elapsedMs) {
   if (elapsedMs < 0) {
     return 1.00;
   }
@@ -65,5 +65,5 @@ export function calculateCurrentMultiplier(elapsedMs, crashPoint) {
   }
   
   // 確保不超過爆炸點
-  return Math.min(currentMultiplier, crashPoint);
+  return currentMultiplier;
 }

@@ -166,7 +166,7 @@ export function useGameEngine() {
     const elapsedMs = now - gameState.currentRound.startTime;
     gameState.currentRound.elapsedTime = elapsedMs;
 
-    const multiplier = calculateCurrentMultiplier(elapsedMs, gameState.currentRound.crashPoint);
+    const multiplier = calculateCurrentMultiplier(elapsedMs);
     gameState.currentRound.currentMultiplier = multiplier;
 
     emit('multiplierUpdate', {
