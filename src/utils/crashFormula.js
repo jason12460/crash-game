@@ -62,6 +62,9 @@ export function calculateCurrentMultiplier(elapsedMs) {
   for (let i = 0; i < currentPhaseIndex; i++) {
     const phase = phases[i];
     const phaseDuration = phase.endTime - previousEndTime;
+
+    // Apply exponential growth: M = M₀ * e^(r*t)
+    // where M₀ is initial multiplier, r is growth rate, t is time duration
     cumulativeMultiplier *= Math.pow(Math.E, phase.rate * phaseDuration);
     previousEndTime = phase.endTime;
   }
@@ -71,7 +74,8 @@ export function calculateCurrentMultiplier(elapsedMs) {
   const timeInCurrentPhase = elapsedMs - previousEndTime;
   cumulativeMultiplier *= Math.pow(Math.E, currentPhase.rate * timeInCurrentPhase);
 
-  return cumulativeMultiplier;
+  //無條件捨去到小數點兩位
+  return Math.floor(cumulativeMultiplier * 100) / 100;
 }
 
 /**

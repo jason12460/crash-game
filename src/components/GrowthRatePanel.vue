@@ -90,6 +90,9 @@
         <button class="btn-warning" @click="handleForceRestart">
           Force Restart Round
         </button>
+        <button class="btn-primary" @click="handleExportJSON">
+          Export JSON
+        </button>
       </div>
 
       <!-- Simulation Mode Section -->
@@ -157,7 +160,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import { useGrowthRateConfig } from '@/composables/useGrowthRateConfig';
-import { calculateCurrentMultiplier, calculateAverageGameTime } from '@/utils/crashFormula';
+import { calculateCurrentMultiplier, calculateAverageGameTime, timeToReachMultiplier } from '@/utils/crashFormula';
 import { useRTPConfig } from '@/composables/useRTPConfig';
 import { useSimulationMode } from '@/composables/useSimulationMode';
 
@@ -286,6 +289,80 @@ const handleReset = () => {
 // Force restart the game round
 const handleForceRestart = () => {
   props.onForceRestart();
+};
+
+// Export JSON data based on current formula
+const handleExportJSON = () => {
+  try {
+    // Calculate time needed to reach 100x multiplier
+    const targetMultiplier = 100;
+    const maxTimeMs = timeToReachMultiplier(targetMultiplier, phases);
+
+    // Generate data points every 100ms
+    const dataPoints = [];
+    let id = 1;
+
+    for (let timeMs = 0; timeMs <= maxTimeMs; timeMs += 100) {
+      const multiplier = calculateCurrentMultiplier(timeMs);
+
+      // Stop if we've reached or exceeded 100x
+      if (multiplier >= targetMultiplier) {
+        dataPoints.push({
+          id: id++,
+          time: timeMs,
+          multiplier: Math.round(multiplier * 100), // Convert to 100-based (1.00x -> 100)
+          increment: 0,
+          crash_probability: 0
+        });
+        break;
+      }
+
+      dataPoints.push({
+        id: id++,
+        time: timeMs,
+        multiplier: Math.round(multiplier * 100), // Convert to 100-based (1.00x -> 100)
+        increment: 0,
+        crash_probability: 0
+      });
+    }
+
+    // Check if last data point has multiplier 10000, if not add one
+    if (dataPoints.length > 0) {
+      const lastPoint = dataPoints[dataPoints.length - 1];
+      if (lastPoint.multiplier !== 10000) {
+        dataPoints.push({
+          id: lastPoint.id + 1,
+          time: lastPoint.time + 100,
+          multiplier: 10000,
+          increment: 0,
+          crash_probability: 0
+        });
+      }
+    }
+
+    // Convert to JSON format
+    const jsonContent = JSON.stringify(dataPoints, null, 2);
+
+    // Create blob and trigger download
+    const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+
+    link.setAttribute('href', url);
+    link.setAttribute('download', 'crash-multiplier-data.json');
+    link.style.visibility = 'hidden';
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
+
+    console.log(`JSON exported successfully with ${dataPoints.length} data points`);
+  } catch (error) {
+    console.error('Error exporting JSON:', error);
+    alert('Failed to export JSON. Please check the console for details.');
+  }
 };
 
 // Real-time preview calculations for every 5 seconds up to 60 seconds
@@ -567,6 +644,27 @@ const averageGameTime = computed(() => {
 }
 
 .btn-warning:active {
+  transform: translateY(1px);
+}
+
+.btn-primary {
+  padding: 8px 16px;
+  background-color: #4a90e2;
+  border: 1px solid #5aa0f2;
+  border-radius: 4px;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover {
+  background-color: #5aa0f2;
+  border-color: #6ab0ff;
+}
+
+.btn-primary:active {
   transform: translateY(1px);
 }
 
