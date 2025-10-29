@@ -5,6 +5,12 @@
     <div v-if="timeToHundredX !== null" class="time-marker">
       到達 100x: {{ timeToHundredX.toFixed(1) }} 秒
     </div>
+    <!-- Tooltip -->
+    <div ref="tooltip" class="chart-tooltip" v-show="tooltipVisible">
+      <div class="tooltip-content">
+        {{ tooltipContent }}
+      </div>
+    </div>
   </div>
 </template>
 
@@ -18,8 +24,11 @@ import { calculateCurrentMultiplier, timeToReachMultiplier } from '@/utils/crash
 const { phases } = useGrowthRateConfig();
 
 const chartContainer = ref(null);
+const tooltip = ref(null);
 let chart = null;
 const timeToHundredX = ref(null);
+const tooltipVisible = ref(false);
+const tooltipContent = ref('');
 
 // 生成曲線數據
 function generateCurveData(maxTime = 60) {
@@ -189,10 +198,71 @@ function initChart() {
         range: [1.0, maxMult * 1.1]
       }
     },
+    cursor: {
+      show: true,
+      x: true,
+      y: true,
+      points: {
+        show: false
+      },
+      drag: {
+        x: false,
+        y: false
+      },
+      sync: {
+        key: 'growth-curve'
+      }
+    },
     padding: [10, 10, 0, 0],
     plugins: [
       createPhaseBackgrounds()
-    ]
+    ],
+    hooks: {
+      setCursor: [
+        (u) => {
+          const { left, top, idx } = u.cursor;
+
+          if (idx === null || idx === undefined) {
+            tooltipVisible.value = false;
+            return;
+          }
+
+          const timeValue = u.data[0][idx];
+          const multValue = u.data[1][idx];
+
+          if (timeValue !== null && timeValue !== undefined &&
+              multValue !== null && multValue !== undefined) {
+            tooltipContent.value = `${timeValue.toFixed(1)}s | ${multValue.toFixed(2)}x`;
+            tooltipVisible.value = true;
+
+            if (tooltip.value) {
+              const tooltipWidth = tooltip.value.offsetWidth;
+              const tooltipHeight = tooltip.value.offsetHeight;
+              const chartRect = chartContainer.value.getBoundingClientRect();
+
+              // Calculate position relative to chart container
+              let tooltipLeft = left + 10;
+              let tooltipTop = top + 10;
+
+              // Prevent tooltip from going off-screen horizontally
+              if (tooltipLeft + tooltipWidth > u.width) {
+                tooltipLeft = left - tooltipWidth - 10;
+              }
+
+              // Prevent tooltip from going off-screen vertically
+              if (tooltipTop + tooltipHeight > u.height) {
+                tooltipTop = top - tooltipHeight - 10;
+              }
+
+              tooltip.value.style.left = `${tooltipLeft}px`;
+              tooltip.value.style.top = `${tooltipTop}px`;
+            }
+          } else {
+            tooltipVisible.value = false;
+          }
+        }
+      ]
+    }
   };
 
   chart = new uPlot(opts, [timeData, multiplierData], chartContainer.value);
@@ -297,5 +367,24 @@ onBeforeUnmount(() => {
   font-weight: 600;
   z-index: 10;
   pointer-events: none;
+}
+
+.chart-tooltip {
+  position: absolute;
+  background: rgba(42, 42, 42, 0.95);
+  border: 1px solid #00ff88;
+  border-radius: 4px;
+  padding: 8px 12px;
+  z-index: 100;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.tooltip-content {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  font-family: 'Courier New', monospace;
 }
 </style>
